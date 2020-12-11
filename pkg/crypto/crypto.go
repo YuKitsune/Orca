@@ -16,6 +16,17 @@ func DecodePrivateKeyFromFile(path string) (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 
+	// Decide the key
+	key, err := DecodePrivateKey(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
+func DecodePrivateKey(raw []byte) (*rsa.PrivateKey, error) {
+
 	// Decode
 	block, _ := pem.Decode(raw)
 	if block == nil || block.Type != "PRIVATE KEY" {
