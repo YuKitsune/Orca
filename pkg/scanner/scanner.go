@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+type FileMatch struct {
+	FileName string
+	Kind string
+	Error error
+}
 
 type ContentMatch struct {
 	LineMatches []LineMatch
@@ -18,8 +23,27 @@ type LineMatch struct {
 type Match struct {
 	StartIndex int
 	EndIndex   int
-	Value      string
-	kind       string
+	value      string
+	Kind       string
+}
+
+func FindDangerousFilesForPatterns(filePaths []string, patterns []patterns.SearchPattern) []FileMatch {
+
+	var matches []FileMatch
+	for i := 0; i < len(filePaths); i++ {
+		var currentFilePath = filePaths[i]
+		for j := 0; j < len(patterns); j++ {
+			var currentPattern = patterns[j]
+			if currentPattern.Regex.MatchString(currentFilePath) {
+				matches = append(matches, FileMatch{
+					FileName: currentFilePath,
+					Kind:     currentPattern.Kind,
+				})
+			}
+		}
+	}
+
+	return matches
 }
 
 func ScanContentForPatterns(content string, patterns []patterns.SearchPattern) ContentMatch {
@@ -61,8 +85,8 @@ func scanLineForPattern(line string, pattern patterns.SearchPattern) []Match {
 		matches = append(matches, Match{
 			StartIndex: startIndex,
 			EndIndex:   endIndex,
-			Value:      line[startIndex:endIndex],
-			kind:       pattern.Kind,
+			value:      line[startIndex:endIndex],
+			Kind:       pattern.Kind,
 		})
 	}
 
