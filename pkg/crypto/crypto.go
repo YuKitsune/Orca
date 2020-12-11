@@ -29,8 +29,8 @@ func DecodePrivateKey(raw []byte) (*rsa.PrivateKey, error) {
 
 	// Decode
 	block, _ := pem.Decode(raw)
-	if block == nil || block.Type != "PRIVATE KEY" {
-		return nil, errors.New("Failed to decode PEM block containing private key")
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return nil, errors.New("failed to decode PEM block containing RSA private key")
 	}
 
 	// TODO: Is this the right decode function?
