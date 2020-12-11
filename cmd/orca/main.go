@@ -3,11 +3,14 @@ package main
 import (
 	"Orca/pkg/crypto"
 	"Orca/pkg/webhooks"
+	"crypto/rsa"
+	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -15,6 +18,7 @@ func main() {
 	var path string
 	var port int
 	var privateKeyFile string
+	var privateKeyString string
 	var secret string
 	var appId int
 
@@ -26,7 +30,7 @@ func main() {
 				Name:    "path",
 				Aliases: []string{"ph"},
 				Value: "/webhooks",
-				Required: true,
+				EnvVars: []string{"ORCA_PATH"},
 				Usage:   "Path to listen for WebHook requests", // Todo: Fix wording
 				Destination: &path,
 			},
@@ -34,22 +38,26 @@ func main() {
 				Name:    "port",
 				Aliases: []string{"pt"},
 				Value: 80,
-				Required: true,
+				EnvVars: []string{"ORCA_PORT"},
 				Usage:   "Port to listen on", // Todo: Fix wording
 				Destination: &port,
 			},
 			&cli.StringFlag{
 				Name:    "private-key-file",
-				Aliases: []string{"pk"},
-				Required: true,
-				EnvVars: []string{"GITHUB_ORCA_PRIVATE_KEY"},
-				Usage:   "GitHub private key for the Orca app. Expects that the private key in PEM format. Converts the newlines",
+				Aliases: []string{"pkf"},
+				Usage:   "GitHub private key file for the Orca app. Expects that the private key in PEM format.",
 				Destination: &privateKeyFile,
+			},
+			&cli.StringFlag{
+				Name:    "private-key",
+				Aliases: []string{"pk"},
+				EnvVars: []string{"GITHUB_ORCA_PRIVATE_KEY"},
+				Usage:   "GitHub private key for the Orca app. Expects that the private key in PEM format.",
+				Destination: &privateKeyString,
 			},
 			&cli.StringFlag{
 				Name:    "secret",
 				Aliases: []string{"s"},
-				Required: true,
 				EnvVars: []string{"GITHUB_ORCA_WEBHOOK_SECRET"},
 				Usage:   "The secret is used to verify that webhooks are sent by GitHub.",
 				Destination: &secret,
@@ -57,7 +65,6 @@ func main() {
 			&cli.IntFlag{
 				Name:    "app-id",
 				Aliases: []string{"id"},
-				Required: true,
 				EnvVars: []string{"GITHUB_ORCA_APP_ID"},
 				Usage:   "The GitHub App's identifier (type integer) set when registering an app.",
 				Destination: &appId,
@@ -65,11 +72,43 @@ func main() {
 		},
 		Action: func(c *cli.Context) error {
 
-			// Get the private key
-			// BUG: Private key file won't parse correctly
-			var privateKey, certErr = crypto.DecodePrivateKeyFromFile(privateKeyFile)
-			if certErr != nil {
-				return certErr
+			// Check the webhook path
+			if len(path) < 1 {
+				return errors.New("a webhook path must be provided")
+			}
+
+			// Check the port number
+			if port > 65535 || port < 1 {
+				return errors.New("a valid port number must be provided")
+			}
+
+			// Check and decode the private key
+			var privateKey *rsa.PrivateKey
+			var keyErr error
+			if len(privateKeyFile) > 0 {
+				privateKey, keyErr = crypto.DecodePrivateKeyFromFile(privateKeyFile)
+			} else if len(privateKeyString) > 0 {
+				// Replace escaped newlines with actual new lines
+				// Todo: I wonder if this is a bad idea? GitHubs own ruby template does this so it should be fine
+				var privateKeyWithNewLines = strings.ReplaceAll(privateKeyString, "\\n", "\n")
+				var privateKeyBytes = []byte(privateKeyWithNewLines)
+				privateKey, keyErr = crypto.DecodePrivateKey(privateKeyBytes)
+			} else {
+				return errors.New("a private key must be provided")
+			}
+
+			if keyErr != nil {
+				return keyErr
+			}
+
+			// Check the secret
+			if len(secret) < 1 {
+				return errors.New("a secret is must be provided")
+			}
+
+			// Check the app ID
+			if appId < 1 {
+				return errors.New("an app id must be provided")
 			}
 
 			// Setup webhook handlers
