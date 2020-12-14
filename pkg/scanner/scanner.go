@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+type CommitScanResult struct {
+	Commit string
+	FileMatches []FileMatch
+	ContentMatches []ContentMatch
+}
+
+func (result *CommitScanResult) HasMatches() bool {
+	return len(result.FileMatches) > 0 || len(result.ContentMatches) > 0
+}
 type File struct {
 	Path *string
 	Content *string

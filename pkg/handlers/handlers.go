@@ -20,16 +20,6 @@ type HandlerContext struct {
 	GitHubAPIClient *gitHubAPI.Client
 }
 
-type CommitScanResult struct {
-	Commit string
-	FileMatches []scanner.FileMatch
-	ContentMatches []scanner.ContentMatch
-}
-
-func (result *CommitScanResult) HasMatches() bool {
-	return len(result.FileMatches) > 0 || len(result.ContentMatches) > 0
-}
-
 func HandleInstallation(installationPayload github.InstallationPayload, handlerContext HandlerContext) {
 
 	// Todo: Scan the repository for any sensitive information
@@ -39,11 +29,11 @@ func HandleInstallation(installationPayload github.InstallationPayload, handlerC
 func HandlePush(pushPayload github.PushPayload, handlerContext HandlerContext) {
 	log.Println("Handling Push event")
 
-	var commitScanResults []CommitScanResult
+	var commitScanResults []scanner.CommitScanResult
 	for _, commit := range pushPayload.Commits {
 
-		var commitScanResult = CommitScanResult {
-			Commit: commit.Sha,
+		var commitScanResult = scanner.CommitScanResult {
+			Commit: commit.ID,
 		}
 
 		var filesToCheck = append(commit.Added, commit.Modified...)
@@ -97,7 +87,10 @@ func HandlePush(pushPayload github.PushPayload, handlerContext HandlerContext) {
 	}
 
 	if len(commitScanResults) > 0 {
-		remediator.RemediateFromPush(pushPayload, commitScanResults, handlerContext)
+		err := remediator.RemediateFromPush(pushPayload, commitScanResults, handlerContext.GitHubAPIClient)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 

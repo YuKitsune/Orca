@@ -1,14 +1,14 @@
 package remediator
 
 import (
-	"Orca/pkg/handlers"
+	"Orca/pkg/scanner"
 	"context"
 	"fmt"
 	gitHubAPI "github.com/google/go-github/v33/github"
 	"gopkg.in/go-playground/webhooks.v5/github"
 )
 
-func RemediateFromPush(pushPayload github.PushPayload, results []handlers.CommitScanResult, handlerContext handlers.HandlerContext) error {
+func RemediateFromPush(pushPayload github.PushPayload, results []scanner.CommitScanResult, gitHubApiClient *gitHubAPI.Client) error {
 	// Open a new issue
 	var title string
 	if len(results) > 1 {
@@ -49,7 +49,7 @@ func RemediateFromPush(pushPayload github.PushPayload, results []handlers.Commit
 		}
 	}
 
-	_, _, err := handlerContext.GitHubAPIClient.Issues.Create(
+	_, _, err := gitHubApiClient.Issues.Create(
 		context.Background(),
 		pushPayload.Repository.Owner.Login,
 		pushPayload.Repository.Name,
