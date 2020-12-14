@@ -1,32 +1,18 @@
 package webhooks
 
 import (
+	"Orca/pkg/api"
 	"Orca/pkg/handlers"
 	"Orca/pkg/patterns"
 	"crypto/rsa"
 	"gopkg.in/go-playground/webhooks.v5/github"
+	"log"
 	"net/http"
 )
 
 func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret string, appId int) error {
 
 	hook, _ := github.New(github.Options.Secret(gitHubSecret))
-
-	var filePatterns, filePatternsErr = patterns.GetFilePatterns()
-	if filePatternsErr != nil {
-		return filePatternsErr
-	}
-
-	var contentPatterns, contentPatternsErr = patterns.GetContentPatterns()
-	if contentPatternsErr != nil {
-		return contentPatternsErr
-	}
-
-	var context = handlers.HandlerContext{
-		AppId: appId,
-		FilePatterns: filePatterns,
-		ContentPatterns: contentPatterns,
-	}
 
 	http.HandleFunc(webHookPath, func(w http.ResponseWriter, r *http.Request) {
 		payload, err := hook.Parse(
@@ -45,50 +31,119 @@ func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret s
 		}
 
 		// Todo: 1. Verify webhook signature
-		// Todo: 2. Authenticate App
-		// Todo: 3. Authenticate Installation (in order to run API operations)
+
+		// Note:
+		// 	getHandlerContext is invoked within each case as it requires an installation ID which is not known until
+		//  the payload has been parsed
+		//  If it can be moved outside of the switch, that would be nice
 
 		// TODO: Can this be automated?
 		switch payload.(type) {
 		case github.InstallationPayload:
 			installation := payload.(github.InstallationPayload)
-			handlers.HandleInstallation(installation, context)
+			context, err := getHandlerContext(installation.Installation.ID, appId, privateKey)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+
+			handlers.HandleInstallation(installation, *context)
 
 		case github.PushPayload:
 			push := payload.(github.PushPayload)
-			handlers.HandlePush(push, context)
+			context, err := getHandlerContext(int64(push.Installation.ID), appId, privateKey)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+			handlers.HandlePush(push, *context)
 
+			// Todo: Installation ID
 		case github.IssuesPayload:
 			issue := payload.(github.IssuesPayload)
 			if issue.Action == "opened" || issue.Action == "edited" {
-				handlers.HandleIssue(issue, context)
+				context, err := getHandlerContext(0, appId, privateKey)
+				if err != nil {
+					log.Fatal(err)
+					return
+				}
+				handlers.HandleIssue(issue, *context)
 			}
 
+			// Todo: Installation ID
 		case github.IssueCommentPayload:
 			issueComment := payload.(github.IssueCommentPayload)
 			if issueComment.Action == "created" || issueComment.Action == "edited" {
-				handlers.HandleIssueComment(issueComment, context)
+				context, err := getHandlerContext(0, appId, privateKey)
+				if err != nil {
+					log.Fatal(err)
+					return
+				}
+				handlers.HandleIssueComment(issueComment, *context)
 			}
 
 		case github.PullRequestPayload:
 			pullRequest := payload.(github.PullRequestPayload)
 			if pullRequest.Action == "opened" || pullRequest.Action == "edited" {
-				handlers.HandlePullRequest(pullRequest, context)
+				context, err := getHandlerContext(pullRequest.Installation.ID, appId, privateKey)
+				if err != nil {
+					log.Fatal(err)
+					return
+				}
+				handlers.HandlePullRequest(pullRequest, *context)
 			}
 
 		case github.PullRequestReviewPayload:
 			pullRequestReview := payload.(github.PullRequestReviewPayload)
 			if pullRequestReview.Action == "submitted" || pullRequestReview.Action == "edited" {
-				handlers.HandlePullRequestReview(pullRequestReview, context)
+				context, err := getHandlerContext(pullRequestReview.Installation.ID, appId, privateKey)
+				if err != nil {
+					log.Fatal(err)
+					return
+				}
+				handlers.HandlePullRequestReview(pullRequestReview, *context)
 			}
 
 		case github.PullRequestReviewCommentPayload:
 			pullRequestReviewComment := payload.(github.PullRequestReviewCommentPayload)
 			if pullRequestReviewComment.Action == "created" || pullRequestReviewComment.Action == "edited" {
-				handlers.HandlePullRequestReviewComment(pullRequestReviewComment, context)
+				context, err := getHandlerContext(pullRequestReviewComment.Installation.ID, appId, privateKey)
+				if err != nil {
+					log.Fatal(err)
+					return
+				}
+				handlers.HandlePullRequestReviewComment(pullRequestReviewComment, *context)
 			}
 		}
 	})
 
 	return nil
+}
+
+func getHandlerContext(installationId int64, appId int, privateKey rsa.PrivateKey) (*handlers.HandlerContext, error) {
+
+	filePatterns, err := patterns.GetFilePatterns()
+	if err != nil {
+		return nil, err
+	}
+
+	contentPatterns, err := patterns.GetContentPatterns()
+	if err != nil {
+		return nil, err
+	}
+
+	gitHubAPIClient, err := api.GetGitHubApiClient(installationId, appId, privateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var context = handlers.HandlerContext{
+		InstallationId: installationId,
+		AppId: appId,
+		FilePatterns: filePatterns,
+		ContentPatterns: contentPatterns,
+		GitHubAPIClient: gitHubAPIClient,
+	}
+
+	return &context, nil
 }

@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 )
 
+const blockType = "RSA PRIVATE KEY"
+
 func DecodePrivateKeyFromFile(path string) (*rsa.PrivateKey, error) {
 
 	// Read the file
@@ -29,7 +31,7 @@ func DecodePrivateKey(raw []byte) (*rsa.PrivateKey, error) {
 
 	// Decode
 	block, _ := pem.Decode(raw)
-	if block == nil || block.Type != "RSA PRIVATE KEY" {
+	if block == nil || block.Type != blockType {
 		return nil, errors.New("failed to decode PEM block containing RSA private key")
 	}
 
@@ -40,4 +42,15 @@ func DecodePrivateKey(raw []byte) (*rsa.PrivateKey, error) {
 	}
 
 	return key, nil
+}
+
+func EncodePrivateKey(privateKey *rsa.PrivateKey) []byte {
+	bytes := pem.EncodeToMemory(
+		&pem.Block{
+			Type: blockType,
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		},
+	)
+
+	return bytes
 }
