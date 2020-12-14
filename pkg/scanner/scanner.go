@@ -5,13 +5,20 @@ import (
 	"strings"
 )
 
+type File struct {
+	Path *string
+	Content *string
+	URL *string
+}
+
 type FileMatch struct {
-	FileName string
+	File
 	Kind string
 	Error error
 }
 
 type ContentMatch struct {
+	File
 	LineMatches []LineMatch
 }
 
@@ -27,38 +34,42 @@ type Match struct {
 	Kind       string
 }
 
-func FindDangerousFilesForPatterns(filePaths []string, patterns []patterns.SearchPattern) []FileMatch {
+func (matches *ContentMatch) HasMatches() bool {
+	return len(matches.LineMatches) > 0
+}
+
+func FindDangerousPatternsFromFile(file File, patterns []patterns.SearchPattern) []FileMatch {
 
 	var matches []FileMatch
-	for i := 0; i < len(filePaths); i++ {
-		var currentFilePath = filePaths[i]
-		for j := 0; j < len(patterns); j++ {
-			var currentPattern = patterns[j]
-			if currentPattern.Regex.MatchString(currentFilePath) {
-				matches = append(matches, FileMatch{
-					FileName: currentFilePath,
-					Kind:     currentPattern.Kind,
-				})
-			}
+	for _, pattern := range patterns {
+		if pattern.Regex.MatchString(*file.Path) {
+			matches = append(matches, FileMatch{
+				File: file,
+				Kind: pattern.Kind,
+			})
 		}
 	}
 
 	return matches
 }
 
-func ScanContentForPatterns(content string, patterns []patterns.SearchPattern) ContentMatch {
+func ScanContentForPatterns(file File, patterns []patterns.SearchPattern) ContentMatch {
 
-	var result ContentMatch
+	result := ContentMatch {
+		File: file,
+	}
 
-	var lines = strings.Split(content, "\n")
-	for i := 0; i < len(lines); i++ {
-		var matchesOnLine = scanLineForPatterns(lines[i], patterns)
-		var lineMatches = LineMatch{
-			LineNumber: i+1,
-			Matches:    matchesOnLine,
+	var lines = strings.Split(*file.Content, "\n")
+	for i, line := range lines {
+		var matchesOnLine = scanLineForPatterns(line, patterns)
+		if len(matchesOnLine) > 0 {
+			var lineMatches = LineMatch{
+				LineNumber: i+1,
+				Matches:    matchesOnLine,
+			}
+
+			result.LineMatches = append(result.LineMatches, lineMatches)
 		}
-
-		result.LineMatches = append(result.LineMatches, lineMatches)
 	}
 
 	return result
@@ -66,8 +77,8 @@ func ScanContentForPatterns(content string, patterns []patterns.SearchPattern) C
 
 func scanLineForPatterns(line string, patterns []patterns.SearchPattern) []Match {
 	var matches []Match
-	for i := 0; i < len(patterns); i++ {
-		var currentPatternMatches = scanLineForPattern(line, patterns[i])
+	for _, pattern := range patterns {
+		var currentPatternMatches = scanLineForPattern(line, pattern)
 		if len(currentPatternMatches) > 0 {
 			matches = append(matches, currentPatternMatches...)
 		}
@@ -79,9 +90,9 @@ func scanLineForPatterns(line string, patterns []patterns.SearchPattern) []Match
 func scanLineForPattern(line string, pattern patterns.SearchPattern) []Match {
 	var matches []Match
 	var regexMatches = pattern.Regex.FindAllStringIndex(line, -1)
-	for i := 0; i < len(regexMatches); i++ {
-		var startIndex = regexMatches[i][0]
-		var endIndex = regexMatches[i][1]
+	for _, match := range regexMatches {
+		var startIndex = match[0]
+		var endIndex = match[1]
 		matches = append(matches, Match{
 			StartIndex: startIndex,
 			EndIndex:   endIndex,

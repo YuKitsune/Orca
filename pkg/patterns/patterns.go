@@ -23,8 +23,15 @@ func MakePattern(regexPattern string, kind string) (*SearchPattern, error) {
 
 func GetContentPatterns() ([]SearchPattern, error) {
 	// Todo: Fetch from API?
+	var patterns []SearchPattern
 
-	return []SearchPattern {}, nil
+	var secretPattern, err = MakePattern("(secret)", "Secret")
+	if err != nil {
+		return nil, err
+	}
+	patterns = append(patterns, *secretPattern)
+
+	return patterns, nil
 }
 
 func GetFilePatterns() ([]SearchPattern, error) {

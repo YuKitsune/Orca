@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"Orca/pkg/patterns"
+	"Orca/pkg/remediator"
 	"Orca/pkg/scanner"
 	"context"
+	"encoding/base64"
 	"fmt"
 	gitHubAPI "github.com/google/go-github/v33/github"
 	"gopkg.in/go-playground/webhooks.v5/github"
@@ -24,6 +26,10 @@ type CommitScanResult struct {
 	ContentMatches []scanner.ContentMatch
 }
 
+func (result *CommitScanResult) HasMatches() bool {
+	return len(result.FileMatches) > 0 || len(result.ContentMatches) > 0
+}
+
 func HandleInstallation(installationPayload github.InstallationPayload, handlerContext HandlerContext) {
 
 	// Todo: Scan the repository for any sensitive information
@@ -42,19 +48,15 @@ func HandlePush(pushPayload github.PushPayload, handlerContext HandlerContext) {
 
 		var filesToCheck = append(commit.Added, commit.Modified...)
 
-		// Check file names
-		var fileScanResults = scanner.FindDangerousFilesForPatterns(filesToCheck, handlerContext.FilePatterns)
-		if len(fileScanResults) > 0 {
-			commitScanResult.FileMatches = append(commitScanResult.FileMatches, fileScanResults...)
-		}
-
 		// Check file contents
-		for _, file := range filesToCheck {
+		// Todo: Is there a bulk alternative to GetContents?
+		// 	Don't want to request for each file, could have a big commit
+		for _, filePath := range filesToCheck {
 			content, _, _, err := handlerContext.GitHubAPIClient.Repositories.GetContents(
 				context.Background(),
 				pushPayload.Repository.Owner.Login,
 				pushPayload.Repository.Name,
-				file,
+				filePath,
 				&gitHubAPI.RepositoryContentGetOptions {
 					Ref: commit.Sha,
 				})
@@ -63,18 +65,39 @@ func HandlePush(pushPayload github.PushPayload, handlerContext HandlerContext) {
 				return
 			}
 
+			contentBytes, err := base64.StdEncoding.DecodeString(*content.Content)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+			contentString := string(contentBytes)
+
+			file := scanner.File {
+				Path: content.Path,
+				Content: &contentString,
+				URL: content.HTMLURL,
+			}
+
+			// Check file names
+			var fileScanResults = scanner.FindDangerousPatternsFromFile(file, handlerContext.FilePatterns)
+			if len(fileScanResults) > 0 {
+				commitScanResult.FileMatches = append(commitScanResult.FileMatches, fileScanResults...)
+			}
+
 			// Search for modified or added files
-			var contentScanResults = scanner.ScanContentForPatterns(*content.Content, handlerContext.ContentPatterns)
-			if len(contentScanResults.LineMatches) > 0 {
+			var contentScanResults = scanner.ScanContentForPatterns(file, handlerContext.ContentPatterns)
+			if contentScanResults.HasMatches() {
 				commitScanResult.ContentMatches = append(commitScanResult.ContentMatches, contentScanResults)
 			}
 		}
 
-		commitScanResults = append(commitScanResults, commitScanResult)
+		if commitScanResult.HasMatches() {
+			commitScanResults = append(commitScanResults, commitScanResult)
+		}
 	}
 
-	if commitScanResults != nil && len(commitScanResults) > 0 {
-		// Todo: Remediation
+	if len(commitScanResults) > 0 {
+		remediator.RemediateFromPush(pushPayload, commitScanResults, handlerContext)
 	}
 }
 
