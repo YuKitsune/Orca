@@ -10,6 +10,7 @@ import (
 	gitHubAPI "github.com/google/go-github/v33/github"
 	"gopkg.in/go-playground/webhooks.v5/github"
 	"log"
+	"strings"
 )
 
 type HandlerContext struct {
@@ -62,10 +63,14 @@ func HandlePush(pushPayload github.PushPayload, handlerContext HandlerContext) {
 			}
 			contentString := string(contentBytes)
 
+			branchName := getBranchFromRef(pushPayload.Ref)
+			permalinkUrl := strings.Replace(*content.HTMLURL, fmt.Sprintf("/%s/", branchName), fmt.Sprintf("/%s/", commit.ID), -1)
+
 			file := scanner.File {
-				Path: content.Path,
+				Path:    content.Path,
 				Content: &contentString,
-				URL: content.HTMLURL,
+				HTMLURL: content.HTMLURL,
+				PermalinkURL: &permalinkUrl,
 			}
 
 			// Check file names
@@ -92,6 +97,13 @@ func HandlePush(pushPayload github.PushPayload, handlerContext HandlerContext) {
 			log.Fatal(err)
 		}
 	}
+}
+
+// Todo: Move this somewhere more sensible
+func getBranchFromRef(ref string) string {
+	refSplit := strings.Split(ref, "/")
+	branchName := refSplit[len(refSplit) - 1]
+	return branchName
 }
 
 func HandleIssue(issuePayload github.IssuesPayload, handlerContext HandlerContext) {

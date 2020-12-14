@@ -27,7 +27,7 @@ func RemediateFromPush(pushPayload github.PushPayload, results []scanner.CommitS
 
 			body += "Potentially sensitive files:\n"
 			for _, dangerousFile := range result.FileMatches {
-				body += fmt.Sprintf("- [%s](%s)\n", *dangerousFile.Path, *dangerousFile.URL)
+				body += fmt.Sprintf("- [%s](%s)\n", *dangerousFile.Path, *dangerousFile.HTMLURL)
 			}
 
 			body += "\n\n"
@@ -39,11 +39,12 @@ func RemediateFromPush(pushPayload github.PushPayload, results []scanner.CommitS
 			body += "Files containing potentially sensitive data:\n"
 			for _, contentMatch := range result.ContentMatches {
 
+				// Todo: Group lines which are directly below each other into one permalink (e.g. #L2-L4)
 				body += fmt.Sprintf("### %s\n", *contentMatch.Path)
 				for _, lineMatch := range contentMatch.LineMatches {
 
 					// TODO: Add a buffer around the line for extra context
-					body += fmt.Sprintf("%s#L%d\n", *contentMatch.URL, lineMatch.LineNumber)
+					body += fmt.Sprintf("%s#L%d\n", *contentMatch.PermalinkURL, lineMatch.LineNumber)
 				}
 			}
 		}

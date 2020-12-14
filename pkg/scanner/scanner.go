@@ -15,9 +15,10 @@ func (result *CommitScanResult) HasMatches() bool {
 	return len(result.FileMatches) > 0 || len(result.ContentMatches) > 0
 }
 type File struct {
-	Path *string
+	Path    *string
 	Content *string
-	URL *string
+	HTMLURL *string
+	PermalinkURL *string
 }
 
 type FileMatch struct {
