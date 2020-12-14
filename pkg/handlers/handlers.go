@@ -48,7 +48,7 @@ func HandlePush(pushPayload github.PushPayload, handlerContext HandlerContext) {
 				pushPayload.Repository.Name,
 				filePath,
 				&gitHubAPI.RepositoryContentGetOptions {
-					Ref: commit.Sha,
+					Ref: commit.ID,
 				})
 			if err != nil {
 				log.Fatal(err)
