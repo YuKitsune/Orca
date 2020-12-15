@@ -1,4 +1,4 @@
-package patterns
+package scanning
 
 import "regexp"
 
@@ -13,7 +13,7 @@ func MakePattern(regexPattern string, kind string) (*SearchPattern, error) {
 		return nil, err
 	}
 
-	var pattern = &SearchPattern {
+	var pattern = &SearchPattern{
 		Regex: *regex,
 		Kind: kind,
 	}

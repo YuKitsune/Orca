@@ -84,21 +84,21 @@ func main() {
 
 			// Check and decode the private key
 			var privateKey *rsa.PrivateKey
-			var keyErr error
+			var err error
 			if len(privateKeyFile) > 0 {
-				privateKey, keyErr = crypto.DecodePrivateKeyFromFile(privateKeyFile)
+				privateKey, err = crypto.DecodePrivateKeyFromFile(privateKeyFile)
 			} else if len(privateKeyString) > 0 {
 				// Replace escaped newlines with actual new lines
 				// Todo: I wonder if this is a bad idea? GitHubs own ruby template does this so it should be fine
 				var privateKeyWithNewLines = strings.ReplaceAll(privateKeyString, "\\n", "\n")
 				var privateKeyBytes = []byte(privateKeyWithNewLines)
-				privateKey, keyErr = crypto.DecodePrivateKey(privateKeyBytes)
+				privateKey, err = crypto.DecodePrivateKey(privateKeyBytes)
 			} else {
 				return errors.New("a private key must be provided")
 			}
 
-			if keyErr != nil {
-				return keyErr
+			if err != nil {
+				return err
 			}
 
 			// Check the secret
@@ -112,7 +112,9 @@ func main() {
 			}
 
 			// Setup webhook handlers
-			webhooks.SetupHandlers(path, *privateKey, secret, appId)
+			if err = webhooks.SetupHandlers(path, *privateKey, secret, appId); err != nil {
+				return err
+			}
 
 			// Start HTTP webhooks
 			log.Printf("Starting webhooks at port %d\n", port)
