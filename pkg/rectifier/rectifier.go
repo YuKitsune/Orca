@@ -138,24 +138,28 @@ func redactMatchesFromContent(content string, result scanning.IssueScanResult, r
 		for i, ch := range contentRunes {
 
 			// Counting each new line we find to find the line number
+			startOfNewLine := false
 			if ch == '\n' {
 				currentLineNumber++
+				indexInLine = 0
+				startOfNewLine = true
 			}
 
-			// Don't care about the rest of this unless we're on the right line number
-			if currentLineNumber != lineNumber {
-				continue
-			}
+			// Make sure we're on the right line
+			if currentLineNumber == lineNumber {
 
-			// At this point we're on the right line
-			// Check if the current index on the line is within the range of one of the matches
-			for _, match := range lineMatch.Matches {
-				if i >= match.StartIndex && i < match.EndIndex {
-					contentRunes[i] = replacementCharacter
+				// Check if the current index on the line is within the range of one of the matches
+				for _, match := range lineMatch.Matches {
+					if indexInLine >= match.StartIndex && indexInLine < match.EndIndex {
+						contentRunes[i] = replacementCharacter
+					}
 				}
 			}
 
-			indexInLine++
+			// Don't increment if we just decided we're on a new line
+			if !startOfNewLine {
+				indexInLine++
+			}
 		}
 	}
 
