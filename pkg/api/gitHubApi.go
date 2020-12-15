@@ -52,7 +52,7 @@ func getAppJsonWebToken(appId int, privatKey rsa.PrivateKey) (*string, error){
 	// Build the JWT
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
 	token.Claims["iat"] = time.Now().Unix()
-	token.Claims["exp"] = time.Now().Add(time.Minute * 10).Unix()
+	token.Claims["exp"] = time.Now().Add(time.Minute * 5).Unix()
 	token.Claims["iss"] = appId
 
 	// Sign and get the complete encoded token as a string
