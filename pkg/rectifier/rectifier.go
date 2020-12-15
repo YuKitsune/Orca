@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	gitHubApi "github.com/google/go-github/v33/github"
+	"log"
 )
 
 type Rectifier struct {
@@ -18,7 +19,7 @@ func NewRectifier(gitHubApiClient *gitHubApi.Client) *Rectifier {
 	}
 }
 
-func (rectifier *Rectifier) RemediateFromPush(pushPayload payloads.PushPayload, results []scanning.CommitScanResult) error {
+func (rectifier *Rectifier) RectifyFromPush(pushPayload payloads.PushPayload, results []scanning.CommitScanResult) error {
 
 	// Open a new issue
 	var title string
@@ -27,6 +28,8 @@ func (rectifier *Rectifier) RemediateFromPush(pushPayload payloads.PushPayload, 
 	} else {
 		title = "Potentially sensitive data found in a commit"
 	}
+
+	log.Printf("Opening a new issue \"%s\"\n", title)
 
 	body := "Potentially sensitive data has recently been pushed to this repository.\n\n"
 
@@ -61,7 +64,7 @@ func (rectifier *Rectifier) RemediateFromPush(pushPayload payloads.PushPayload, 
 		}
 	}
 
-	_, _, err := rectifier.GitHubApiClient.Issues.Create(
+	issue, _, err := rectifier.GitHubApiClient.Issues.Create(
 		context.Background(),
 		pushPayload.Repository.Owner.Login,
 		pushPayload.Repository.Name,
@@ -74,11 +77,14 @@ func (rectifier *Rectifier) RemediateFromPush(pushPayload payloads.PushPayload, 
 		return err
 	}
 
+	log.Printf("Issue #%d opened\n", issue.Number)
+
 	return nil
 }
 
 func (rectifier *Rectifier) RemediateFromIssue(issue payloads.IssuePayload, result scanning.IssueScanResult) error {
 
+	log.Printf("Redacting matches from #%d\n", issue.Number)
 	newBody := redactMatchesFromContent(issue.Body, result, '*')
 
 	// Replace the issue body with the new body with redacted matches
@@ -93,12 +99,14 @@ func (rectifier *Rectifier) RemediateFromIssue(issue payloads.IssuePayload, resu
 	if err != nil {
 		return err
 	}
+	log.Printf("Matches from #%d redacted\n", issue.Number)
 
 	return nil
 }
 
 func (rectifier *Rectifier) RemediateFromIssueComment(issue payloads.IssueCommentPayload, result scanning.IssueScanResult) error {
 
+	log.Printf("Redacting matches from #%d (comment %d)\n", issue.Number, issue.CommentId)
 	newBody := redactMatchesFromContent(issue.Body, result, '*')
 
 	// Replace the issue body with the new body with redacted matches
@@ -113,6 +121,7 @@ func (rectifier *Rectifier) RemediateFromIssueComment(issue payloads.IssueCommen
 	if err != nil {
 		return err
 	}
+	log.Printf("Matches from #%d (comment %d) redacted\n", issue.Number, issue.CommentId)
 
 	return nil
 }

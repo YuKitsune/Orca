@@ -50,7 +50,7 @@ func (handler *Handler) HandleInstallation(installationPayload github.Installati
 // Todo: Move payload conversion outside of this file
 
 func (handler *Handler) HandlePush(pushPayload github.PushPayload) {
-	log.Println("Handling Push event")
+	log.Println("Handling push...")
 
 	// Convert the payload
 	payload := payloads.NewPushPayload(pushPayload)
@@ -65,14 +65,18 @@ func (handler *Handler) HandlePush(pushPayload github.PushPayload) {
 	// If anything shows up in the results, take action
 	if len(*commitScanResults) > 0 {
 		rectifier := rectifier.NewRectifier(handler.GitHubApiClient)
-		err := rectifier.RemediateFromPush(payload, *commitScanResults)
+		err := rectifier.RectifyFromPush(payload, *commitScanResults)
 		if err != nil {
 			log.Fatal(err)
+			return
 		}
+
+		log.Println("Push has been addressed")
 	}
 }
 
 func (handler *Handler) HandleIssue(issuePayload github.IssuesPayload) {
+	log.Println("Handling issue...")
 
 	// Convert the payload
 	payload := payloads.NewIssuePayload(issuePayload)
@@ -86,11 +90,15 @@ func (handler *Handler) HandleIssue(issuePayload github.IssuesPayload) {
 		err := rectifier.RemediateFromIssue(payload, issueScanResult)
 		if err != nil {
 			log.Fatal(err)
+			return
 		}
+
+		log.Println("Issue has been addressed")
 	}
 }
 
 func (handler *Handler) HandleIssueComment(issueCommentPayload github.IssueCommentPayload) {
+	log.Println("Handling issue...")
 
 	// Convert the payload
 	payload := payloads.NewIssueCommentPayload(issueCommentPayload)
@@ -100,17 +108,21 @@ func (handler *Handler) HandleIssueComment(issueCommentPayload github.IssueComme
 
 	// If anything shows up in the results, take action
 	if issueScanResult.HasMatches() {
+		log.Println("Potentially sensitive information detected. Rectifying...")
 		rectifier := rectifier.NewRectifier(handler.GitHubApiClient)
 		err := rectifier.RemediateFromIssueComment(payload, issueScanResult)
 		if err != nil {
 			log.Fatal(err)
+			return
 		}
+
+		log.Println("Issue comment has been addressed")
 	}
 }
 
 func (handler *Handler) HandlePullRequest(pullRequestPayload github.PullRequestPayload) {
 
-	fmt.Println("Handling pull request")
+	fmt.Println("Handling pull request...")
 	// Todo: 1. Scan pull request
 	// Todo: 2. Checkout tip of branch
 	// Todo: 3. Scan files
@@ -119,12 +131,12 @@ func (handler *Handler) HandlePullRequest(pullRequestPayload github.PullRequestP
 
 func (handler *Handler) HandlePullRequestReview(pullRequestReviewPayload github.PullRequestReviewPayload) {
 
-	fmt.Println("Handling pull request review")
+	fmt.Println("Handling pull request review...")
 	// Todo: 1. Scan review content
 }
 
 func (handler *Handler) HandlePullRequestReviewComment(pullRequestReviewCommentPayload github.PullRequestReviewCommentPayload) {
 
-	fmt.Println("Handling pull request review comment")
+	fmt.Println("Handling pull request review comment...")
 	// Todo: 1. Scan review content
 }
