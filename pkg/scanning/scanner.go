@@ -43,65 +43,53 @@ func (matches *ContentMatch) HasMatches() bool {
 }
 
 type Scanner struct {
-	FileNamePatterns []SearchPattern
-	ContentPatterns  []SearchPattern
+	Patterns []SearchPattern
 }
 
-func NewScanner() (*Scanner, error) {
-	fileNamePatterns, err := GetFileNamePatterns()
-	if err != nil {
-		return nil, err
-	}
+func NewScanner(patternStore *PatternStore) (*Scanner, error) {
 
-	contentPatterns, err := GetContentPatterns()
+	patterns, err := (*patternStore).GetPatterns()
 	if err != nil {
 		return nil, err
 	}
 
 	scanner := &Scanner {
-		FileNamePatterns: fileNamePatterns,
-		ContentPatterns:  contentPatterns,
+		Patterns: patterns,
 	}
 
 	return scanner, nil
 }
 
-func (scanner *Scanner) CheckFileName(file File) []FileMatch {
-
-	var matches []FileMatch
-	for _, pattern := range scanner.FileNamePatterns {
-		if pattern.Regex.MatchString(*file.Path) {
-			matches = append(matches, FileMatch{
-				File: file,
-				Kind: pattern.Kind,
-			})
-		}
-	}
-
-	return matches
-}
-
-func (scanner *Scanner) CheckFileContent(file File) FileContentMatch {
+func (scanner *Scanner) CheckFileContent(file File) (*FileContentMatch, error) {
 
 	result := FileContentMatch {
 		File: file,
 	}
 
-	contentResult := scanner.checkContent(*file.Content)
+	contentResult, err := scanner.checkContent(*file.Content)
+	if err != nil {
+		return nil, err
+	}
+
 	if contentResult.HasMatches() {
 		result.LineMatches = contentResult.LineMatches
 	}
 
-	return result
+	return &result, nil
 }
 
-func (scanner *Scanner) checkContent(content string) ContentMatch {
+func (scanner *Scanner) checkContent(content string) (*ContentMatch, error) {
 
 	var result ContentMatch
 
+	// Todo: Multi-line scan first, then single-line scan around any multi-line match ranges
 	var lines = strings.Split(content, "\n")
 	for i, line := range lines {
-		var matchesOnLine = scanner.scanLineForPatterns(line)
+		matchesOnLine, err := scanner.scanLineForPatterns(line)
+		if err != nil {
+			return nil, err
+		}
+
 		if len(matchesOnLine) > 0 {
 			var lineMatches = LineMatch{
 				LineNumber: i+1,
@@ -112,24 +100,33 @@ func (scanner *Scanner) checkContent(content string) ContentMatch {
 		}
 	}
 
- 	return result
+ 	return &result, nil
 }
 
-func (scanner *Scanner) scanLineForPatterns(line string) []Match {
+func (scanner *Scanner) scanLineForPatterns(line string) ([]Match, error) {
 	var matches []Match
-	for _, pattern := range scanner.ContentPatterns {
-		var currentPatternMatches = scanLineForPattern(line, pattern)
+	for _, pattern := range scanner.Patterns {
+		currentPatternMatches, err := scanLineForPattern(line, pattern)
+		if err != nil {
+			return nil, err
+		}
+
 		if len(currentPatternMatches) > 0 {
 			matches = append(matches, currentPatternMatches...)
 		}
 	}
 
-	return matches
+	return matches, nil
 }
 
-func scanLineForPattern(line string, pattern SearchPattern) []Match {
+func scanLineForPattern(line string, pattern SearchPattern) ([]Match, error) {
 	var matches []Match
-	var regexMatches = pattern.Regex.FindAllStringIndex(line, -1)
+	regex, err := pattern.GetRegexp()
+	if err != nil {
+		return nil, err
+	}
+
+	var regexMatches = regex.FindAllStringIndex(line, -1)
 	for _, match := range regexMatches {
 		var startIndex = match[0]
 		var endIndex = match[1]
@@ -141,5 +138,5 @@ func scanLineForPattern(line string, pattern SearchPattern) []Match {
 		})
 	}
 
-	return matches
+	return matches, nil
 }

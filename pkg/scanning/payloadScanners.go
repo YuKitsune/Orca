@@ -10,13 +10,12 @@ import (
 )
 
 type CommitScanResult struct {
-	Commit string
-	FileMatches []FileMatch
-	ContentMatches []FileContentMatch
+	Commit  string
+	Matches []FileContentMatch
 }
 
 func (result *CommitScanResult) HasMatches() bool {
-	return len(result.FileMatches) > 0 || len(result.ContentMatches) > 0
+	return len(result.Matches) > 0
 }
 
 type IssueScanResult struct {
@@ -85,37 +84,38 @@ func (scanner *Scanner) CheckCommit(commit payloads.Commit, gitHubApiClient *git
 			PermalinkURL: &permalinkUrl,
 		}
 
-		// Check file names
-		var fileScanResults = scanner.CheckFileName(file)
-		if len(fileScanResults) > 0 {
-			commitScanResult.FileMatches = append(commitScanResult.FileMatches, fileScanResults...)
+		// Search for modified or added files
+		contentScanResults, err := scanner.CheckFileContent(file)
+		if err != nil {
+			return nil, err
 		}
 
-		// Search for modified or added files
-		var contentScanResults = scanner.CheckFileContent(file)
 		if contentScanResults.HasMatches() {
-			commitScanResult.ContentMatches = append(commitScanResult.ContentMatches, contentScanResults)
+			commitScanResult.Matches = append(commitScanResult.Matches, *contentScanResults)
 		}
 	}
 
 	return &commitScanResult, nil
 }
 
-func (scanner *Scanner) CheckIssue(issue payloads.IssuePayload) IssueScanResult {
+func (scanner *Scanner) CheckIssue(issue payloads.IssuePayload) (*IssueScanResult, error) {
 	return scanner.checkIssueBody(issue.Body)
 }
 
-func (scanner *Scanner) CheckIssueComment(issueComment payloads.IssueCommentPayload) IssueScanResult {
+func (scanner *Scanner) CheckIssueComment(issueComment payloads.IssueCommentPayload) (*IssueScanResult, error) {
 	return scanner.checkIssueBody(issueComment.Body)
 
 }
 
-func (scanner *Scanner) checkIssueBody(issueBody string) IssueScanResult {
+func (scanner *Scanner) checkIssueBody(issueBody string) (*IssueScanResult, error) {
 	var issueScanResult IssueScanResult
-	contentResult := scanner.checkContent(issueBody)
+	contentResult, err := scanner.checkContent(issueBody)
+	if err != nil {
+		return nil, err
+	}
 	if contentResult.HasMatches() {
 		issueScanResult.LineMatches = contentResult.LineMatches
 	}
 
-	return issueScanResult
+	return &issueScanResult, nil
 }

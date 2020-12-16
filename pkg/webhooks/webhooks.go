@@ -2,13 +2,14 @@ package webhooks
 
 import (
 	"Orca/pkg/handlers"
+	"Orca/pkg/scanning"
 	"crypto/rsa"
 	"gopkg.in/go-playground/webhooks.v5/github"
 	"log"
 	"net/http"
 )
 
-func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret string, appId int) error {
+func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret string, appId int, patternStore *scanning.PatternStore) error {
 
 	hook, _ := github.New(github.Options.Secret(gitHubSecret))
 
@@ -39,7 +40,7 @@ func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret s
 		switch payload.(type) {
 		case github.InstallationPayload:
 			installation := payload.(github.InstallationPayload)
-			handler, err := handlers.NewHandler(installation.Installation.ID, appId, privateKey)
+			handler, err := handlers.NewHandler(installation.Installation.ID, appId, privateKey, patternStore)
 			if err != nil {
 				log.Fatal(err)
 				return
@@ -49,7 +50,7 @@ func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret s
 
 		case github.PushPayload:
 			push := payload.(github.PushPayload)
-			handler, err := handlers.NewHandler(int64(push.Installation.ID), appId, privateKey)
+			handler, err := handlers.NewHandler(int64(push.Installation.ID), appId, privateKey, patternStore)
 			if err != nil {
 				log.Fatal(err)
 				return
@@ -62,7 +63,7 @@ func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret s
 		case github.IssuesPayload:
 			issue := payload.(github.IssuesPayload)
 			if issue.Action == "opened" || issue.Action == "edited" {
-				handler, err := handlers.NewHandler(0, appId, privateKey)
+				handler, err := handlers.NewHandler(0, appId, privateKey, patternStore)
 				if err != nil {
 					log.Fatal(err)
 					return
@@ -74,7 +75,7 @@ func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret s
 		case github.IssueCommentPayload:
 			issueComment := payload.(github.IssueCommentPayload)
 			if issueComment.Action == "created" || issueComment.Action == "edited" {
-				handler, err := handlers.NewHandler(0, appId, privateKey)
+				handler, err := handlers.NewHandler(0, appId, privateKey, patternStore)
 				if err != nil {
 					log.Fatal(err)
 					return
@@ -86,7 +87,7 @@ func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret s
 		case github.PullRequestPayload:
 			pullRequest := payload.(github.PullRequestPayload)
 			if pullRequest.Action == "opened" || pullRequest.Action == "edited" {
-				handler, err := handlers.NewHandler(pullRequest.Installation.ID, appId, privateKey)
+				handler, err := handlers.NewHandler(pullRequest.Installation.ID, appId, privateKey, patternStore)
 				if err != nil {
 					log.Fatal(err)
 					return
@@ -98,7 +99,7 @@ func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret s
 		case github.PullRequestReviewPayload:
 			pullRequestReview := payload.(github.PullRequestReviewPayload)
 			if pullRequestReview.Action == "submitted" || pullRequestReview.Action == "edited" {
-				handler, err := handlers.NewHandler(pullRequestReview.Installation.ID, appId, privateKey)
+				handler, err := handlers.NewHandler(pullRequestReview.Installation.ID, appId, privateKey, patternStore)
 				if err != nil {
 					log.Fatal(err)
 					return
@@ -110,7 +111,7 @@ func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret s
 		case github.PullRequestReviewCommentPayload:
 			pullRequestReviewComment := payload.(github.PullRequestReviewCommentPayload)
 			if pullRequestReviewComment.Action == "created" || pullRequestReviewComment.Action == "edited" {
-				handler, err := handlers.NewHandler(pullRequestReviewComment.Installation.ID, appId, privateKey)
+				handler, err := handlers.NewHandler(pullRequestReviewComment.Installation.ID, appId, privateKey, patternStore)
 				if err != nil {
 					log.Fatal(err)
 					return

@@ -1,0 +1,6 @@
+[
+  {
+    "pattern": "(secret)",
+    "kind": "Test Secret"
+  }
+]

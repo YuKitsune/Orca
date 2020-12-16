@@ -36,22 +36,11 @@ func (rectifier *Rectifier) RectifyFromPush(pushPayload payloads.PushPayload, re
 	for _, result := range results {
 		body += fmt.Sprintf("Introduced in %s:\n", result.Commit)
 
-		// Add dangerous files
-		if len(result.FileMatches) > 0 {
-
-			body += "Potentially sensitive files:\n"
-			for _, dangerousFile := range result.FileMatches {
-				body += fmt.Sprintf("- [%s](%s)\n", *dangerousFile.Path, *dangerousFile.HTMLURL)
-			}
-
-			body += "\n\n"
-		}
-
 		// Add content matches
-		if len(result.ContentMatches) > 0 {
+		if len(result.Matches) > 0 {
 
 			body += "Files containing potentially sensitive data:\n"
-			for _, contentMatch := range result.ContentMatches {
+			for _, contentMatch := range result.Matches {
 
 				// Todo: Group lines which are directly below each other into one permalink (e.g. #L2-L4)
 				body += fmt.Sprintf("### %s\n", *contentMatch.Path)
@@ -82,7 +71,7 @@ func (rectifier *Rectifier) RectifyFromPush(pushPayload payloads.PushPayload, re
 	return nil
 }
 
-func (rectifier *Rectifier) RemediateFromIssue(issue payloads.IssuePayload, result scanning.IssueScanResult) error {
+func (rectifier *Rectifier) RemediateFromIssue(issue payloads.IssuePayload, result *scanning.IssueScanResult) error {
 
 	log.Printf("Redacting matches from #%d\n", issue.Number)
 	newBody := redactMatchesFromContent(issue.Body, result, '*')
@@ -104,7 +93,7 @@ func (rectifier *Rectifier) RemediateFromIssue(issue payloads.IssuePayload, resu
 	return nil
 }
 
-func (rectifier *Rectifier) RemediateFromIssueComment(issue payloads.IssueCommentPayload, result scanning.IssueScanResult) error {
+func (rectifier *Rectifier) RemediateFromIssueComment(issue payloads.IssueCommentPayload, result *scanning.IssueScanResult) error {
 
 	log.Printf("Redacting matches from #%d (comment %d)\n", issue.Number, issue.CommentId)
 	newBody := redactMatchesFromContent(issue.Body, result, '*')
@@ -126,7 +115,7 @@ func (rectifier *Rectifier) RemediateFromIssueComment(issue payloads.IssueCommen
 	return nil
 }
 
-func redactMatchesFromContent(content string, result scanning.IssueScanResult, replacementCharacter rune) string {
+func redactMatchesFromContent(content string, result *scanning.IssueScanResult, replacementCharacter rune) string {
 
 	contentRunes := []rune(content)
 	for _, lineMatch := range result.LineMatches {

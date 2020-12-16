@@ -19,9 +19,9 @@ type Handler struct {
 	Scanner 		*scanning.Scanner
 }
 
-func NewHandler(installationId int64, appId int, privateKey rsa.PrivateKey) (*Handler, error) {
+func NewHandler(installationId int64, appId int, privateKey rsa.PrivateKey, patternStore *scanning.PatternStore) (*Handler, error) {
 
-	scanner, err := scanning.NewScanner()
+	scanner, err := scanning.NewScanner(patternStore)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +72,8 @@ func (handler *Handler) HandlePush(pushPayload github.PushPayload) {
 		}
 
 		log.Println("Push has been addressed")
+	} else {
+		log.Println("No matches to address")
 	}
 }
 
@@ -82,7 +84,11 @@ func (handler *Handler) HandleIssue(issuePayload github.IssuesPayload) {
 	payload := payloads.NewIssuePayload(issuePayload)
 
 	// Check the contents of the issue
-	issueScanResult := handler.Scanner.CheckIssue(payload)
+	issueScanResult, err := handler.Scanner.CheckIssue(payload)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 
 	// If anything shows up in the results, take action
 	if issueScanResult.HasMatches() {
@@ -94,6 +100,8 @@ func (handler *Handler) HandleIssue(issuePayload github.IssuesPayload) {
 		}
 
 		log.Println("Issue has been addressed")
+	} else {
+		log.Println("No matches to address")
 	}
 }
 
@@ -104,7 +112,11 @@ func (handler *Handler) HandleIssueComment(issueCommentPayload github.IssueComme
 	payload := payloads.NewIssueCommentPayload(issueCommentPayload)
 
 	// Check the contents of the comment
-	issueScanResult := handler.Scanner.CheckIssueComment(payload)
+	issueScanResult, err := handler.Scanner.CheckIssueComment(payload)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 
 	// If anything shows up in the results, take action
 	if issueScanResult.HasMatches() {
@@ -117,6 +129,8 @@ func (handler *Handler) HandleIssueComment(issueCommentPayload github.IssueComme
 		}
 
 		log.Println("Issue comment has been addressed")
+	} else {
+		log.Println("No matches to address")
 	}
 }
 

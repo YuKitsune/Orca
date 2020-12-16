@@ -2,6 +2,7 @@ package main
 
 import (
 	"Orca/pkg/crypto"
+	"Orca/pkg/scanning"
 	"Orca/pkg/webhooks"
 	"crypto/rsa"
 	"errors"
@@ -21,6 +22,7 @@ func main() {
 	var privateKeyString string
 	var secret string
 	var appId int
+	var patternsLocation string
 
 	app := &cli.App{
 		Name: "Orca",
@@ -69,6 +71,13 @@ func main() {
 				Usage:   "The GitHub App's identifier (type integer) set when registering an app.",
 				Destination: &appId,
 			},
+			&cli.StringFlag{
+				Name:    "patterns-location",
+				Aliases: []string{"pl"},
+				EnvVars: []string{"ORCA_PATTERNS_LOCATION"},
+				Usage:   "The location of the patterns to check for. Accepts a file path or HTTP URL.",
+				Destination: &patternsLocation,
+			},
 		},
 		Action: func(c *cli.Context) error {
 
@@ -111,8 +120,14 @@ func main() {
 				return errors.New("an app id must be provided")
 			}
 
+			// Get the Pattern store
+			patternStore, err := scanning.NewPatternStore(patternsLocation)
+			if err != nil {
+				return err
+			}
+
 			// Setup webhook handlers
-			if err = webhooks.SetupHandlers(path, *privateKey, secret, appId); err != nil {
+			if err = webhooks.SetupHandlers(path, *privateKey, secret, appId, &patternStore); err != nil {
 				return err
 			}
 
