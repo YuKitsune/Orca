@@ -43,12 +43,12 @@ func (matches *ContentMatch) HasMatches() bool {
 }
 
 type Scanner struct {
-	FilePatterns    []SearchPattern
-	ContentPatterns []SearchPattern
+	FileNamePatterns []SearchPattern
+	ContentPatterns  []SearchPattern
 }
 
 func NewScanner() (*Scanner, error) {
-	filePatterns, err := GetFilePatterns()
+	fileNamePatterns, err := GetFileNamePatterns()
 	if err != nil {
 		return nil, err
 	}
@@ -59,8 +59,8 @@ func NewScanner() (*Scanner, error) {
 	}
 
 	scanner := &Scanner {
-		FilePatterns: filePatterns,
-		ContentPatterns: contentPatterns,
+		FileNamePatterns: fileNamePatterns,
+		ContentPatterns:  contentPatterns,
 	}
 
 	return scanner, nil
@@ -69,7 +69,7 @@ func NewScanner() (*Scanner, error) {
 func (scanner *Scanner) CheckFileName(file File) []FileMatch {
 
 	var matches []FileMatch
-	for _, pattern := range scanner.FilePatterns {
+	for _, pattern := range scanner.FileNamePatterns {
 		if pattern.Regex.MatchString(*file.Path) {
 			matches = append(matches, FileMatch{
 				File: file,

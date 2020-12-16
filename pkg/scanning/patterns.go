@@ -25,16 +25,16 @@ func GetContentPatterns() ([]SearchPattern, error) {
 	// Todo: Fetch from API?
 	var patterns []SearchPattern
 
-	var secretPattern, err = MakePattern("(secret)", "Secret")
+	var gitHubPat, err = MakePattern("[a-z0-9]{40}", "GitHub Personal Access Token")
 	if err != nil {
 		return nil, err
 	}
-	patterns = append(patterns, *secretPattern)
+	patterns = append(patterns, *gitHubPat)
 
 	return patterns, nil
 }
 
-func GetFilePatterns() ([]SearchPattern, error) {
+func GetFileNamePatterns() ([]SearchPattern, error) {
 	// Todo: Fetch from API?
 	var patterns []SearchPattern
 
