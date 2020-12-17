@@ -4,123 +4,157 @@ import (
 	"Orca/pkg/handlers"
 	"Orca/pkg/scanning"
 	"crypto/rsa"
-	"gopkg.in/go-playground/webhooks.v5/github"
+	"github.com/google/go-github/v33/github"
 	"log"
 	"net/http"
 )
 
-func SetupHandlers(webHookPath string, privateKey rsa.PrivateKey, gitHubSecret string, appId int, patternStore *scanning.PatternStore) error {
+type WebhookHandler struct {
+	Path string
+	AppId int
+	PatternStore *scanning.PatternStore
+	privateKey rsa.PrivateKey
+	secret string
+}
 
-	hook, _ := github.New(github.Options.Secret(gitHubSecret))
+func NewWebhookHandler(
+	webHookPath string,
+	appId int,
+	patternStore *scanning.PatternStore,
+	privateKey rsa.PrivateKey,
+	gitHubSecret string) *WebhookHandler {
+	handler := WebhookHandler{
+		Path:         webHookPath,
+		AppId:        appId,
+		PatternStore: patternStore,
+		privateKey:   privateKey,
+		secret:       gitHubSecret,
+	}
 
-	http.HandleFunc(webHookPath, func(w http.ResponseWriter, r *http.Request) {
-		payload, err := hook.Parse(
-			r,
-			github.InstallationEvent,
-			github.PushEvent,
-			github.IssuesEvent,
-			github.IssueCommentEvent,
-			github.PullRequestEvent,
-			github.PullRequestReviewEvent,
-			github.PullRequestReviewCommentEvent)
+	return &handler
+}
+
+func (webHookHandler *WebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
+
+	// Gets the body as bytes and validates the signature
+	body, err := github.ValidatePayload(r, []byte(webHookHandler.secret))
+	if err != nil {
+		log.Printf("Error reading body: %v", err)
+		http.Error(w, "can't read body", http.StatusBadRequest)
+		return
+	}
+
+	webHookType := github.WebHookType(r)
+	payload, err := github.ParseWebHook(webHookType, body)
+
+	// TODO: Can this be automated?
+	switch payload.(type) {
+	case github.InstallationEvent:
+		installation := payload.(github.InstallationEvent)
+		handler, err := handlers.NewPayloadHandler(
+			*installation.Installation.ID,
+			webHookHandler.AppId,
+			webHookHandler.privateKey,
+			webHookHandler.PatternStore)
 		if err != nil {
-			if err == github.ErrEventNotFound {
-				// Event wasn't one of the ones asked to be parsed
-			}
+			log.Fatal(err)
+			return
 		}
 
-		// Todo: 1. Verify webhook signature
+		handler.HandleInstallation(installation)
 
-		// Note:
-		// 	getHandlerContext is invoked within each case as it requires an installation ID which is not known until
-		//  the payload has been parsed
-		//  If it can be moved outside of the switch, that would be nice
+	case github.PushEvent:
+		push := payload.(github.PushEvent)
+		handler, err := handlers.NewPayloadHandler(
+			*push.Installation.ID,
+			webHookHandler.AppId,
+			webHookHandler.privateKey,
+			webHookHandler.PatternStore)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
 
-		// TODO: Can this be automated?
-		switch payload.(type) {
-		case github.InstallationPayload:
-			installation := payload.(github.InstallationPayload)
-			handler, err := handlers.NewHandler(installation.Installation.ID, appId, privateKey, patternStore)
+		handler.HandlePush(push)
+
+	case github.IssuesEvent:
+		issue := payload.(github.IssuesEvent)
+		if *issue.Action == "opened" || *issue.Action == "edited" {
+			handler, err := handlers.NewPayloadHandler(
+				*issue.Installation.ID,
+				webHookHandler.AppId,
+				webHookHandler.privateKey,
+				webHookHandler.PatternStore)
 			if err != nil {
 				log.Fatal(err)
 				return
 			}
 
-			handler.HandleInstallation(installation)
+			handler.HandleIssue(issue)
+		}
 
-		case github.PushPayload:
-			push := payload.(github.PushPayload)
-			handler, err := handlers.NewHandler(int64(push.Installation.ID), appId, privateKey, patternStore)
+	case github.IssueCommentEvent:
+		issueComment := payload.(github.IssueCommentEvent)
+		if *issueComment.Action == "created" || *issueComment.Action == "edited" {
+			handler, err := handlers.NewPayloadHandler(
+				*issueComment.Installation.ID,
+				webHookHandler.AppId,
+				webHookHandler.privateKey,
+				webHookHandler.PatternStore)
 			if err != nil {
 				log.Fatal(err)
 				return
 			}
 
-			handler.HandlePush(push)
-
-			// Todo: The go-playground/webhooks package didn't include the Installation ID with Issues for some reason
-			// 	Will need to make a PR and remove the hard-coded 0 once it's been merged
-		case github.IssuesPayload:
-			issue := payload.(github.IssuesPayload)
-			if issue.Action == "opened" || issue.Action == "edited" {
-				handler, err := handlers.NewHandler(0, appId, privateKey, patternStore)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-
-				handler.HandleIssue(issue)
-			}
-
-		case github.IssueCommentPayload:
-			issueComment := payload.(github.IssueCommentPayload)
-			if issueComment.Action == "created" || issueComment.Action == "edited" {
-				handler, err := handlers.NewHandler(0, appId, privateKey, patternStore)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-
-				handler.HandleIssueComment(issueComment)
-			}
-
-		case github.PullRequestPayload:
-			pullRequest := payload.(github.PullRequestPayload)
-			if pullRequest.Action == "opened" || pullRequest.Action == "edited" {
-				handler, err := handlers.NewHandler(pullRequest.Installation.ID, appId, privateKey, patternStore)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-
-				handler.HandlePullRequest(pullRequest)
-			}
-
-		case github.PullRequestReviewPayload:
-			pullRequestReview := payload.(github.PullRequestReviewPayload)
-			if pullRequestReview.Action == "submitted" || pullRequestReview.Action == "edited" {
-				handler, err := handlers.NewHandler(pullRequestReview.Installation.ID, appId, privateKey, patternStore)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-
-				handler.HandlePullRequestReview(pullRequestReview)
-			}
-
-		case github.PullRequestReviewCommentPayload:
-			pullRequestReviewComment := payload.(github.PullRequestReviewCommentPayload)
-			if pullRequestReviewComment.Action == "created" || pullRequestReviewComment.Action == "edited" {
-				handler, err := handlers.NewHandler(pullRequestReviewComment.Installation.ID, appId, privateKey, patternStore)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-
-				handler.HandlePullRequestReviewComment(pullRequestReviewComment)
-			}
+			handler.HandleIssueComment(issueComment)
 		}
-	})
 
-	return nil
+	case github.PullRequestEvent:
+		pullRequest := payload.(github.PullRequestEvent)
+		if *pullRequest.Action == "opened" || *pullRequest.Action == "edited" {
+			handler, err := handlers.NewPayloadHandler(
+				*pullRequest.Installation.ID,
+				webHookHandler.AppId,
+				webHookHandler.privateKey,
+				webHookHandler.PatternStore)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+
+			handler.HandlePullRequest(pullRequest)
+		}
+
+	case github.PullRequestReviewEvent:
+		pullRequestReview := payload.(github.PullRequestReviewEvent)
+		if *pullRequestReview.Action == "submitted" || *pullRequestReview.Action == "edited" {
+			handler, err := handlers.NewPayloadHandler(
+				*pullRequestReview.Installation.ID,
+				webHookHandler.AppId,
+				webHookHandler.privateKey,
+				webHookHandler.PatternStore)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+
+			handler.HandlePullRequestReview(pullRequestReview)
+		}
+
+	case github.PullRequestReviewCommentEvent:
+		pullRequestReviewComment := payload.(github.PullRequestReviewCommentEvent)
+		if *pullRequestReviewComment.Action == "created" || *pullRequestReviewComment.Action == "edited" {
+			handler, err := handlers.NewPayloadHandler(
+				*pullRequestReviewComment.Installation.ID,
+				webHookHandler.AppId,
+				webHookHandler.privateKey,
+				webHookHandler.PatternStore)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+
+			handler.HandlePullRequestReviewComment(pullRequestReviewComment)
+		}
+	}
 }

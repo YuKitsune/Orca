@@ -2,24 +2,26 @@ package handlers
 
 import (
 	"Orca/pkg/api"
-	"Orca/pkg/payloads"
 	"Orca/pkg/rectifier"
 	"Orca/pkg/scanning"
 	"crypto/rsa"
 	"fmt"
-	gitHubApi "github.com/google/go-github/v33/github"
-	"gopkg.in/go-playground/webhooks.v5/github"
+	"github.com/google/go-github/v33/github"
 	"log"
 )
 
-type Handler struct {
+type PayloadHandler struct {
 	InstallationId  int64
 	AppId           int
-	GitHubApiClient *gitHubApi.Client
+	GitHubApiClient *github.Client
 	Scanner 		*scanning.Scanner
 }
 
-func NewHandler(installationId int64, appId int, privateKey rsa.PrivateKey, patternStore *scanning.PatternStore) (*Handler, error) {
+func NewPayloadHandler(
+	installationId int64,
+	appId int,
+	privateKey rsa.PrivateKey,
+	patternStore *scanning.PatternStore) (*PayloadHandler, error) {
 
 	scanner, err := scanning.NewScanner(patternStore)
 	if err != nil {
@@ -31,7 +33,7 @@ func NewHandler(installationId int64, appId int, privateKey rsa.PrivateKey, patt
 		return nil, err
 	}
 
-	handler := Handler {
+	handler := PayloadHandler{
 		InstallationId:  installationId,
 		AppId:           appId,
 		GitHubApiClient: gitHubApiClient,
@@ -41,7 +43,7 @@ func NewHandler(installationId int64, appId int, privateKey rsa.PrivateKey, patt
 	return &handler, nil
 }
 
-func (handler *Handler) HandleInstallation(installationPayload github.InstallationPayload) {
+func (handler *PayloadHandler) HandleInstallation(installationPayload github.InstallationEvent) {
 
 	// Todo: Scan the repository for any sensitive information
 	// 	May not be viable for large repositories with a long history
@@ -49,23 +51,20 @@ func (handler *Handler) HandleInstallation(installationPayload github.Installati
 
 // Todo: Move payload conversion outside of this file
 
-func (handler *Handler) HandlePush(pushPayload github.PushPayload) {
+func (handler *PayloadHandler) HandlePush(pushPayload github.PushEvent) {
 	log.Println("Handling push...")
 
-	// Convert the payload
-	payload := payloads.NewPushPayload(pushPayload)
-
 	// Check the commits
-	commitScanResults, err := handler.Scanner.CheckPush(payload, handler.GitHubApiClient)
+	commitScanResults, err := handler.Scanner.CheckPush(pushPayload, handler.GitHubApiClient)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
 	// If anything shows up in the results, take action
-	if len(*commitScanResults) > 0 {
-		rectifier := rectifier.NewRectifier(handler.GitHubApiClient)
-		err := rectifier.RectifyFromPush(payload, *commitScanResults)
+	if len(commitScanResults) > 0 {
+		matchHandler := rectifier.NewMatchHandler(handler.GitHubApiClient)
+		err := matchHandler.HandleMatchesFromPush(pushPayload, commitScanResults)
 		if err != nil {
 			log.Fatal(err)
 			return
@@ -77,14 +76,11 @@ func (handler *Handler) HandlePush(pushPayload github.PushPayload) {
 	}
 }
 
-func (handler *Handler) HandleIssue(issuePayload github.IssuesPayload) {
+func (handler *PayloadHandler) HandleIssue(issuePayload github.IssuesEvent) {
 	log.Println("Handling issue...")
 
-	// Convert the payload
-	payload := payloads.NewIssuePayload(issuePayload)
-
 	// Check the contents of the issue
-	issueScanResult, err := handler.Scanner.CheckIssue(payload)
+	issueScanResult, err := handler.Scanner.CheckIssue(&issuePayload)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -92,8 +88,8 @@ func (handler *Handler) HandleIssue(issuePayload github.IssuesPayload) {
 
 	// If anything shows up in the results, take action
 	if issueScanResult.HasMatches() {
-		rectifier := rectifier.NewRectifier(handler.GitHubApiClient)
-		err := rectifier.RemediateFromIssue(payload, issueScanResult)
+		matchHandler := rectifier.NewMatchHandler(handler.GitHubApiClient)
+		err := matchHandler.HandleMatchesFromIssue(issuePayload, issueScanResult)
 		if err != nil {
 			log.Fatal(err)
 			return
@@ -105,14 +101,11 @@ func (handler *Handler) HandleIssue(issuePayload github.IssuesPayload) {
 	}
 }
 
-func (handler *Handler) HandleIssueComment(issueCommentPayload github.IssueCommentPayload) {
+func (handler *PayloadHandler) HandleIssueComment(issueCommentPayload github.IssueCommentEvent) {
 	log.Println("Handling issue...")
 
-	// Convert the payload
-	payload := payloads.NewIssueCommentPayload(issueCommentPayload)
-
 	// Check the contents of the comment
-	issueScanResult, err := handler.Scanner.CheckIssueComment(payload)
+	issueScanResult, err := handler.Scanner.CheckIssueComment(&issueCommentPayload)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -121,8 +114,8 @@ func (handler *Handler) HandleIssueComment(issueCommentPayload github.IssueComme
 	// If anything shows up in the results, take action
 	if issueScanResult.HasMatches() {
 		log.Println("Potentially sensitive information detected. Rectifying...")
-		rectifier := rectifier.NewRectifier(handler.GitHubApiClient)
-		err := rectifier.RemediateFromIssueComment(payload, issueScanResult)
+		matchHandler := rectifier.NewMatchHandler(handler.GitHubApiClient)
+		err := matchHandler.HandleMatchesFromIssueComment(issueCommentPayload, issueScanResult)
 		if err != nil {
 			log.Fatal(err)
 			return
@@ -134,7 +127,7 @@ func (handler *Handler) HandleIssueComment(issueCommentPayload github.IssueComme
 	}
 }
 
-func (handler *Handler) HandlePullRequest(pullRequestPayload github.PullRequestPayload) {
+func (handler *PayloadHandler) HandlePullRequest(pullRequestPayload github.PullRequestEvent) {
 
 	fmt.Println("Handling pull request...")
 	// Todo: 1. Scan pull request
@@ -143,13 +136,13 @@ func (handler *Handler) HandlePullRequest(pullRequestPayload github.PullRequestP
 	// Todo: 4. Scan any previously un-scanned commits on branch
 }
 
-func (handler *Handler) HandlePullRequestReview(pullRequestReviewPayload github.PullRequestReviewPayload) {
+func (handler *PayloadHandler) HandlePullRequestReview(pullRequestReviewPayload github.PullRequestReviewEvent) {
 
 	fmt.Println("Handling pull request review...")
 	// Todo: 1. Scan review content
 }
 
-func (handler *Handler) HandlePullRequestReviewComment(pullRequestReviewCommentPayload github.PullRequestReviewCommentPayload) {
+func (handler *PayloadHandler) HandlePullRequestReviewComment(pullRequestReviewCommentPayload github.PullRequestReviewCommentEvent) {
 
 	fmt.Println("Handling pull request review comment...")
 	// Todo: 1. Scan review content

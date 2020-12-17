@@ -1,25 +1,24 @@
 package rectifier
 
 import (
-	"Orca/pkg/payloads"
 	"Orca/pkg/scanning"
 	"context"
 	"fmt"
-	gitHubApi "github.com/google/go-github/v33/github"
+	"github.com/google/go-github/v33/github"
 	"log"
 )
 
-type Rectifier struct {
-	GitHubApiClient *gitHubApi.Client
+type MatchHandler struct {
+	GitHubApiClient *github.Client
 }
 
-func NewRectifier(gitHubApiClient *gitHubApi.Client) *Rectifier {
-	return &Rectifier {
+func NewMatchHandler(gitHubApiClient *github.Client) *MatchHandler {
+	return &MatchHandler{
 		GitHubApiClient: gitHubApiClient,
 	}
 }
 
-func (rectifier *Rectifier) RectifyFromPush(pushPayload payloads.PushPayload, results []scanning.CommitScanResult) error {
+func (matchHandler *MatchHandler) HandleMatchesFromPush(pushPayload github.PushEvent, results []scanning.CommitScanResult) error {
 
 	// Open a new issue
 	var title string
@@ -53,14 +52,14 @@ func (rectifier *Rectifier) RectifyFromPush(pushPayload payloads.PushPayload, re
 		}
 	}
 
-	issue, _, err := rectifier.GitHubApiClient.Issues.Create(
+	issue, _, err := matchHandler.GitHubApiClient.Issues.Create(
 		context.Background(),
-		pushPayload.Repository.Owner.Login,
-		pushPayload.Repository.Name,
-		&gitHubApi.IssueRequest{
+		*pushPayload.Repo.Owner.Login,
+		*pushPayload.Repo.Name,
+		&github.IssueRequest{
 			Title:     &title,
 			Body:      &body,
-			Assignee:  &pushPayload.Author.Name,
+			Assignee:  pushPayload.Pusher.Name,
 		})
 	if err != nil {
 		return err
@@ -71,46 +70,46 @@ func (rectifier *Rectifier) RectifyFromPush(pushPayload payloads.PushPayload, re
 	return nil
 }
 
-func (rectifier *Rectifier) RemediateFromIssue(issue payloads.IssuePayload, result *scanning.IssueScanResult) error {
+func (matchHandler *MatchHandler) HandleMatchesFromIssue(issue github.IssuesEvent, result *scanning.IssueScanResult) error {
 
-	log.Printf("Redacting matches from #%d\n", issue.Number)
-	newBody := redactMatchesFromContent(issue.Body, result, '*')
+	log.Printf("Redacting matches from #%d\n", issue.Issue.Number)
+	newBody := redactMatchesFromContent(*issue.Issue.Body, result, '*')
 
 	// Replace the issue body with the new body with redacted matches
-	_, _, err := rectifier.GitHubApiClient.Issues.Edit(
+	_, _, err := matchHandler.GitHubApiClient.Issues.Edit(
 		context.Background(),
-		issue.Repository.Owner.Login,
-		issue.Repository.Name,
-		issue.Number,
-		&gitHubApi.IssueRequest {
+		*issue.Issue.Repository.Owner.Login,
+		*issue.Issue.Repository.Name,
+		*issue.Issue.Number,
+		&github.IssueRequest {
 			Body: &newBody,
 		})
 	if err != nil {
 		return err
 	}
-	log.Printf("Matches from #%d redacted\n", issue.Number)
+	log.Printf("Matches from #%d redacted\n", issue.Issue.Number)
 
 	return nil
 }
 
-func (rectifier *Rectifier) RemediateFromIssueComment(issue payloads.IssueCommentPayload, result *scanning.IssueScanResult) error {
+func (matchHandler *MatchHandler) HandleMatchesFromIssueComment(issue github.IssueCommentEvent, result *scanning.IssueScanResult) error {
 
-	log.Printf("Redacting matches from #%d (comment %d)\n", issue.Number, issue.CommentId)
-	newBody := redactMatchesFromContent(issue.Body, result, '*')
+	log.Printf("Redacting matches from #%d (comment %d)\n", issue.Issue.Number, issue.Comment.ID)
+	newBody := redactMatchesFromContent(*issue.Issue.Body, result, '*')
 
 	// Replace the issue body with the new body with redacted matches
-	_, _, err := rectifier.GitHubApiClient.Issues.EditComment(
+	_, _, err := matchHandler.GitHubApiClient.Issues.EditComment(
 		context.Background(),
-		issue.Repository.Owner.Login,
-		issue.Repository.Name,
-		issue.CommentId,
-		&gitHubApi.IssueComment{
+		*issue.Repo.Owner.Login,
+		*issue.Repo.Name,
+		*issue.Comment.ID,
+		&github.IssueComment{
 			Body: &newBody,
 		})
 	if err != nil {
 		return err
 	}
-	log.Printf("Matches from #%d (comment %d) redacted\n", issue.Number, issue.CommentId)
+	log.Printf("Matches from #%d (comment %d) redacted\n", issue.Issue.Number, issue.Comment.ID)
 
 	return nil
 }
