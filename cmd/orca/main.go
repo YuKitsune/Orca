@@ -127,7 +127,7 @@ func main() {
 			}
 
 			// Setup webhook handlers
-			webHookHandler := handlers.NewWebhookHandler(path, appId, &patternStore, *privateKey, secret);
+			webHookHandler := handlers.NewWebhookHandler(path, appId, &patternStore, privateKey, secret)
 
 			// Start HTTP webhooks
 			log.Printf("Starting webhooks at port %d\n", port)

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func GetGitHubApiClient(installationId int64, appId int, privateKey rsa.PrivateKey) (*github.Client, error) {
+func GetGitHubApiClient(installationId int64, appId int, privateKey *rsa.PrivateKey) (*github.Client, error) {
 
 	// Get the GitHub App Installation access token
 	accessToken, err := getInstallationAccessToken(installationId, appId, privateKey)
@@ -26,7 +26,7 @@ func GetGitHubApiClient(installationId int64, appId int, privateKey rsa.PrivateK
 	return client, nil
 }
 
-func getInstallationAccessToken(installationId int64, appId int, privateKey rsa.PrivateKey) (*string, error) {
+func getInstallationAccessToken(installationId int64, appId int, privateKey *rsa.PrivateKey) (*string, error) {
 
 	// To get the Installation access token, we first need the Apps JWT
 	appToken, err := getAppJsonWebToken(appId, privateKey)
@@ -47,7 +47,7 @@ func getInstallationAccessToken(installationId int64, appId int, privateKey rsa.
 	return tokenResponse.Token, nil
 }
 
-func getAppJsonWebToken(appId int, privatKey rsa.PrivateKey) (*string, error){
+func getAppJsonWebToken(appId int, privatKey *rsa.PrivateKey) (*string, error){
 
 	// Build the JWT
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
@@ -56,7 +56,7 @@ func getAppJsonWebToken(appId int, privatKey rsa.PrivateKey) (*string, error){
 	token.Claims["iss"] = appId
 
 	// Sign and get the complete encoded token as a string
-	privateKeyBytes := crypto.EncodePrivateKey(&privatKey)
+	privateKeyBytes := crypto.EncodePrivateKey(privatKey)
 	tokenString, err := token.SignedString(privateKeyBytes)
 	if err != nil {
 		return nil, err

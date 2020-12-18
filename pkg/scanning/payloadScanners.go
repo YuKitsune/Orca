@@ -88,7 +88,6 @@ func (scanner *Scanner) CheckIssue(issue *github.IssuesEvent) (*IssueScanResult,
 
 func (scanner *Scanner) CheckIssueComment(issueComment *github.IssueCommentEvent) (*IssueScanResult, error) {
 	return scanner.checkIssueBody(issueComment.Comment.Body)
-
 }
 
 func (scanner *Scanner) checkIssueBody(issueBody *string) (*IssueScanResult, error) {

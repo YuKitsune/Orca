@@ -19,7 +19,7 @@ type PayloadHandler struct {
 func NewPayloadHandler(
 	installationId int64,
 	appId int,
-	privateKey rsa.PrivateKey,
+	privateKey *rsa.PrivateKey,
 	patternStore *scanning.PatternStore) (*PayloadHandler, error) {
 
 	scanner, err := scanning.NewScanner(patternStore)

@@ -12,7 +12,7 @@ type WebhookHandler struct {
 	Path string
 	AppId int
 	PatternStore *scanning.PatternStore
-	privateKey rsa.PrivateKey
+	privateKey *rsa.PrivateKey
 	secret string
 }
 
@@ -20,7 +20,7 @@ func NewWebhookHandler(
 	webHookPath string,
 	appId int,
 	patternStore *scanning.PatternStore,
-	privateKey rsa.PrivateKey,
+	privateKey *rsa.PrivateKey,
 	gitHubSecret string) *WebhookHandler {
 	handler := WebhookHandler{
 		Path:         webHookPath,
@@ -38,122 +38,97 @@ func (webHookHandler *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	// Gets the body as bytes and validates the signature
 	body, err := github.ValidatePayload(r, []byte(webHookHandler.secret))
 	if err != nil {
-		log.Printf("Error reading body: %v", err)
-		http.Error(w, "can't read body", http.StatusBadRequest)
-		return
+		webHookHandler.HandleError(w, err)
 	}
 
 	// NOTE: github.ParseWebHook will return a pointer to the webhook payload
-	//	Type switches need to switch on pointers of the desired type
+	//	Type switches need to switch on pointers of the desired type otherwise they won't work
 	webHookType := github.WebHookType(r)
 	parsedPayload, err := github.ParseWebHook(webHookType, body)
 	if err != nil {
-		log.Printf("Error reading payload: %v", err)
-		http.Error(w, "can't read payload", http.StatusBadRequest)
-		return
+		webHookHandler.HandleError(w, err)
 	}
 
 	// TODO: Can this be automated?
 	switch payload := parsedPayload.(type) {
 	case *github.InstallationEvent:
-		payloadHandler, err := NewPayloadHandler(
-			*payload.Installation.ID,
-			webHookHandler.AppId,
-			webHookHandler.privateKey,
-			webHookHandler.PatternStore)
+		payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 		if err != nil {
-			log.Fatal(err)
-			return
+			webHookHandler.HandleError(w, err)
 		}
 
 		payloadHandler.HandleInstallation(payload)
 
 	case *github.PushEvent:
-		handler, err := NewPayloadHandler(
-			*payload.Installation.ID,
-			webHookHandler.AppId,
-			webHookHandler.privateKey,
-			webHookHandler.PatternStore)
+		payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 		if err != nil {
-			log.Fatal(err)
-			return
+			webHookHandler.HandleError(w, err)
 		}
 
-		handler.HandlePush(payload)
+		payloadHandler.HandlePush(payload)
 
 	case *github.IssuesEvent:
 		if *payload.Action == "opened" || *payload.Action == "edited" {
-			handler, err := NewPayloadHandler(
-				*payload.Installation.ID,
-				webHookHandler.AppId,
-				webHookHandler.privateKey,
-				webHookHandler.PatternStore)
+			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				log.Fatal(err)
-				return
+				webHookHandler.HandleError(w, err)
 			}
 
-			handler.HandleIssue(payload)
+			payloadHandler.HandleIssue(payload)
 		}
 
 	case *github.IssueCommentEvent:
 		if *payload.Action == "created" || *payload.Action == "edited" {
-			handler, err := NewPayloadHandler(
-				*payload.Installation.ID,
-				webHookHandler.AppId,
-				webHookHandler.privateKey,
-				webHookHandler.PatternStore)
+			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				log.Fatal(err)
-				return
+				webHookHandler.HandleError(w, err)
 			}
 
-			handler.HandleIssueComment(payload)
+			payloadHandler.HandleIssueComment(payload)
 		}
 
 	case *github.PullRequestEvent:
 		if *payload.Action == "opened" || *payload.Action == "edited" {
-			handler, err := NewPayloadHandler(
-				*payload.Installation.ID,
-				webHookHandler.AppId,
-				webHookHandler.privateKey,
-				webHookHandler.PatternStore)
+			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				log.Fatal(err)
-				return
+				webHookHandler.HandleError(w, err)
 			}
 
-			handler.HandlePullRequest(payload)
+			payloadHandler.HandlePullRequest(payload)
 		}
 
 	case *github.PullRequestReviewEvent:
 		if *payload.Action == "submitted" || *payload.Action == "edited" {
-			handler, err := NewPayloadHandler(
-				*payload.Installation.ID,
-				webHookHandler.AppId,
-				webHookHandler.privateKey,
-				webHookHandler.PatternStore)
+			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				log.Fatal(err)
-				return
+				webHookHandler.HandleError(w, err)
 			}
 
-			handler.HandlePullRequestReview(payload)
+			payloadHandler.HandlePullRequestReview(payload)
 		}
 
 	case *github.PullRequestReviewCommentEvent:
 		if *payload.Action == "created" || *payload.Action == "edited" {
-			handler, err := NewPayloadHandler(
-				*payload.Installation.ID,
-				webHookHandler.AppId,
-				webHookHandler.privateKey,
-				webHookHandler.PatternStore)
+			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				log.Fatal(err)
-				return
+				webHookHandler.HandleError(w, err)
 			}
 
-			handler.HandlePullRequestReviewComment(payload)
+			payloadHandler.HandlePullRequestReviewComment(payload)
 		}
 	}
+}
+
+func (webHookHandler *WebhookHandler) MakePayloadHandler(installationId *int64) (*PayloadHandler, error) {
+	payloadHandler, err := NewPayloadHandler(*installationId, webHookHandler.AppId, webHookHandler.privateKey, webHookHandler.PatternStore)
+	if err != nil {
+		return nil, err
+	}
+
+	return payloadHandler, nil
+}
+
+func (webHookHandler *WebhookHandler) HandleError(w http.ResponseWriter, err error) {
+	http.Error(w, "failed to handle payload", http.StatusBadRequest)
+	log.Fatalf("Error handling WebHook request: %v", err)
 }
