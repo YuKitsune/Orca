@@ -130,13 +130,30 @@ func scanLineForPattern(line string, pattern SearchPattern) ([]Match, error) {
 	for _, match := range regexMatches {
 		var startIndex = match[0]
 		var endIndex = match[1]
+		value := line[startIndex:endIndex]
+
+		// Ignore if the matched string is allowed to be excluded from checks
+		if Contains(pattern.Exclusions, value) {
+			continue
+		}
+
 		matches = append(matches, Match{
 			StartIndex: startIndex,
 			EndIndex:   endIndex,
-			value:      line[startIndex:endIndex],
+			value:      value,
 			Kind:       pattern.Kind,
 		})
 	}
 
 	return matches, nil
+}
+
+func Contains(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+
+	return false
 }
