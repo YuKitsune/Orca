@@ -21,7 +21,7 @@ type IssueScanResult struct {
 	ContentMatch
 }
 
-func (scanner *Scanner) CheckPush(push github.PushEvent, githubClient *github.Client) ([]CommitScanResult, error) {
+func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.Client) ([]CommitScanResult, error) {
 
 	var commitScanResults []CommitScanResult
 	for _, commit := range push.Commits {

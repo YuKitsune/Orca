@@ -2,8 +2,8 @@ package main
 
 import (
 	"Orca/pkg/crypto"
+	"Orca/pkg/handlers"
 	"Orca/pkg/scanning"
-	"Orca/pkg/webhooks"
 	"crypto/rsa"
 	"errors"
 	"fmt"
@@ -127,14 +127,12 @@ func main() {
 			}
 
 			// Setup webhook handlers
-			if err = webhooks.SetupHandlers(path, *privateKey, secret, appId, &patternStore); err != nil {
-				return err
-			}
+			webHookHandler := handlers.NewWebhookHandler(path, appId, &patternStore, *privateKey, secret);
 
 			// Start HTTP webhooks
 			log.Printf("Starting webhooks at port %d\n", port)
 			var address = fmt.Sprintf(":%d", port)
-			if err := http.ListenAndServe(address, nil); err != nil {
+			if err := http.ListenAndServe(address, webHookHandler); err != nil {
 				return err
 			}
 

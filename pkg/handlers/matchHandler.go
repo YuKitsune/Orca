@@ -1,4 +1,4 @@
-package rectifier
+package handlers
 
 import (
 	"Orca/pkg/scanning"
@@ -18,7 +18,7 @@ func NewMatchHandler(gitHubApiClient *github.Client) *MatchHandler {
 	}
 }
 
-func (matchHandler *MatchHandler) HandleMatchesFromPush(pushPayload github.PushEvent, results []scanning.CommitScanResult) error {
+func (matchHandler *MatchHandler) HandleMatchesFromPush(pushPayload *github.PushEvent, results []scanning.CommitScanResult) error {
 
 	// Open a new issue
 	var title string
@@ -70,7 +70,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromPush(pushPayload github.PushE
 	return nil
 }
 
-func (matchHandler *MatchHandler) HandleMatchesFromIssue(issue github.IssuesEvent, result *scanning.IssueScanResult) error {
+func (matchHandler *MatchHandler) HandleMatchesFromIssue(issue *github.IssuesEvent, result *scanning.IssueScanResult) error {
 
 	log.Printf("Redacting matches from #%d\n", issue.Issue.Number)
 	newBody := redactMatchesFromContent(*issue.Issue.Body, result, '*')
@@ -92,10 +92,10 @@ func (matchHandler *MatchHandler) HandleMatchesFromIssue(issue github.IssuesEven
 	return nil
 }
 
-func (matchHandler *MatchHandler) HandleMatchesFromIssueComment(issue github.IssueCommentEvent, result *scanning.IssueScanResult) error {
+func (matchHandler *MatchHandler) HandleMatchesFromIssueComment(issue *github.IssueCommentEvent, result *scanning.IssueScanResult) error {
 
 	log.Printf("Redacting matches from #%d (comment %d)\n", issue.Issue.Number, issue.Comment.ID)
-	newBody := redactMatchesFromContent(*issue.Issue.Body, result, '*')
+	newBody := redactMatchesFromContent(*issue.Comment.Body, result, '*')
 
 	// Replace the issue body with the new body with redacted matches
 	_, _, err := matchHandler.GitHubApiClient.Issues.EditComment(

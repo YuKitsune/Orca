@@ -66,7 +66,7 @@ func (scanner *Scanner) CheckFileContent(file File) (*FileContentMatch, error) {
 		File: file,
 	}
 
-	contentResult, err := scanner.checkContent(*file.Content)
+	contentResult, err := scanner.checkContent(file.Content)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +78,12 @@ func (scanner *Scanner) CheckFileContent(file File) (*FileContentMatch, error) {
 	return &result, nil
 }
 
-func (scanner *Scanner) checkContent(content string) (*ContentMatch, error) {
+func (scanner *Scanner) checkContent(content *string) (*ContentMatch, error) {
 
 	var result ContentMatch
 
 	// Todo: Multi-line scan first, then single-line scan around any multi-line match ranges
-	var lines = strings.Split(content, "\n")
+	var lines = strings.Split(*content, "\n")
 	for i, line := range lines {
 		matchesOnLine, err := scanner.scanLineForPatterns(line)
 		if err != nil {
@@ -125,7 +125,7 @@ func scanLineForPattern(line string, pattern SearchPattern) ([]Match, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	
 	var regexMatches = regex.FindAllStringIndex(line, -1)
 	for _, match := range regexMatches {
 		var startIndex = match[0]
