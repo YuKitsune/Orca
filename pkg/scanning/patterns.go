@@ -15,7 +15,10 @@ func (pattern *SearchPattern) GetRegexp() (*regexp.Regexp, error) {
 func (pattern *SearchPattern) CanIgnore(value string) bool {
 	for _, exclusionPatternString := range pattern.Exclusions {
 		exclusionPattern := regexp.MustCompile(exclusionPatternString)
-		return exclusionPattern.MatchString(value)
+		if exclusionPattern.MatchString(value) {
+			return true
+		}
 	}
+
 	return false
 }
