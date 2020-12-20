@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/go-github/v33/github"
 	"log"
+	"strings"
 )
 
 type MatchHandler struct {
@@ -46,6 +47,12 @@ func (matchHandler *MatchHandler) HandleMatchesFromPush(pushPayload *github.Push
 				for _, lineMatch := range contentMatch.LineMatches {
 
 					// TODO: Add a buffer around the line for extra context
+					var matchKinds []string
+					for _, match := range lineMatch.Matches {
+						matchKinds = append(matchKinds, match.Kind)
+					}
+
+					body += fmt.Sprintf("#### %s:", strings.Join(matchKinds, ", "))
 					body += fmt.Sprintf("%s#L%d\n", *contentMatch.PermalinkURL, lineMatch.LineNumber)
 				}
 			}
