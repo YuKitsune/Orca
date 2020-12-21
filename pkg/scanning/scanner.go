@@ -1,6 +1,9 @@
 package scanning
 
 import (
+	"context"
+	"encoding/base64"
+	"github.com/google/go-github/v33/github"
 	"strings"
 )
 
@@ -58,6 +61,45 @@ func NewScanner(patternStore *PatternStore) (*Scanner, error) {
 	}
 
 	return scanner, nil
+}
+
+func (scanner *Scanner) CheckFileContentFromCommit(
+	githubClient *github.Client,
+	repoOwner *string,
+	repoName *string,
+	commit *string,
+	filePath *string) (*FileContentMatch, error) {
+
+	// Todo: Is there a bulk alternative to GetContents?
+	// 	Don't want to request for each file, could have a big commit
+	content, _, _, err := githubClient.Repositories.GetContents(
+		context.Background(),
+		*repoOwner,
+		*repoName,
+		*filePath,
+		&github.RepositoryContentGetOptions {
+			Ref: *commit,
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	contentBytes, err := base64.StdEncoding.DecodeString(*content.Content)
+	if err != nil {
+		return nil, err
+	}
+	contentString := string(contentBytes)
+
+	permalinkUrl := *content.HTMLURL
+
+	file := File {
+		Path:    content.Path,
+		Content: &contentString,
+		HTMLURL: content.HTMLURL,
+		PermalinkURL: &permalinkUrl,
+	}
+
+	return scanner.CheckFileContent(file)
 }
 
 func (scanner *Scanner) CheckFileContent(file File) (*FileContentMatch, error) {
