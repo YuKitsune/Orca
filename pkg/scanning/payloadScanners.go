@@ -2,11 +2,12 @@ package scanning
 
 import (
 	"context"
-	"encoding/base64"
-	"fmt"
 	"github.com/google/go-github/v33/github"
-	"strings"
 )
+
+type Result interface {
+	HasMatches() bool
+}
 
 type CommitScanResult struct {
 	Commit  string
@@ -21,6 +22,19 @@ type IssueScanResult struct {
 	ContentMatch
 }
 
+func (result *IssueScanResult) HasMatches() bool {
+	return len(result.LineMatches) > 0
+}
+
+type PullRequestScanResult struct {
+	ContentMatch
+	Commits []CommitScanResult
+}
+
+func (result *PullRequestScanResult) HasMatches() bool {
+	return len(result.LineMatches) > 0 || len(result.Commits) > 0
+}
+
 func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.Client) ([]CommitScanResult, error) {
 
 	var commitScanResults []CommitScanResult
@@ -30,46 +44,23 @@ func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.C
 			Commit: *commit.ID,
 		}
 
+		// Only want to check added or modified files
+		// Deleted files should already have been checked before hand
 		var filesToCheck = append(commit.Added, commit.Modified...)
 
 		// Check file contents
-		// Todo: Is there a bulk alternative to GetContents?
-		// 	Don't want to request for each file, could have a big commit
 		for _, filePath := range filesToCheck {
-			content, _, _, err := githubClient.Repositories.GetContents(
-				context.Background(),
-				*push.Repo.Owner.Login,
-				*push.Repo.Name,
-				filePath,
-				&github.RepositoryContentGetOptions {
-					Ref: *commit.ID,
-				})
+			contentScanResults, err := scanner.CheckFileContentFromCommit(
+				githubClient,
+				push.Repo.Owner.Login,
+				push.Repo.Name,
+				commit.ID,
+				&filePath)
 			if err != nil {
 				return nil, err
 			}
 
-			contentBytes, err := base64.StdEncoding.DecodeString(*content.Content)
-			if err != nil {
-				return nil, err
-			}
-			contentString := string(contentBytes)
-
-			permalinkUrl := strings.Replace(*content.HTMLURL, fmt.Sprintf("/%s/", *push.Ref), fmt.Sprintf("/%s/", *commit.ID), -1)
-
-			file := File {
-				Path:    content.Path,
-				Content: &contentString,
-				HTMLURL: content.HTMLURL,
-				PermalinkURL: &permalinkUrl,
-			}
-
-			// Search for modified or added files
-			contentScanResults, err := scanner.CheckFileContent(file)
-			if err != nil {
-				return nil, err
-			}
-
-			if contentScanResults.HasMatches() {
+			if len(contentScanResults.LineMatches) > 0 {
 				commitScanResult.Matches = append(commitScanResult.Matches, *contentScanResults)
 			}
 		}
@@ -90,15 +81,83 @@ func (scanner *Scanner) CheckIssueComment(issueComment *github.IssueCommentEvent
 	return scanner.checkIssueBody(issueComment.Comment.Body)
 }
 
-func (scanner *Scanner) checkIssueBody(issueBody *string) (*IssueScanResult, error) {
-	var issueScanResult IssueScanResult
-	contentResult, err := scanner.checkContent(issueBody)
+func (scanner *Scanner) checkIssueBody(body *string) (*IssueScanResult, error) {
+	result, err := scanner.CheckTextBody(body)
 	if err != nil {
 		return nil, err
 	}
-	if contentResult.HasMatches() {
-		issueScanResult.LineMatches = contentResult.LineMatches
+
+	if len(result.LineMatches) > 1 {
+		issueResult := IssueScanResult{*result}
+		return &issueResult, nil
 	}
 
-	return &issueScanResult, nil
+	return nil, nil
+}
+
+func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent, githubClient *github.Client) (*PullRequestScanResult, error) {
+
+	// Check the Pull Request body
+	contentMatch, err := scanner.CheckTextBody(pullRequest.PullRequest.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get a list of the commits on the PRs branch
+	commits, _, err := githubClient.Repositories.ListCommits(
+		context.Background(),
+		*pullRequest.Repo.Owner.Login,
+		*pullRequest.Repo.Name,
+		&github.CommitsListOptions{
+
+			// TODO: this will get all commits on the PRs branch, but this won't be very good if we're making a PR from
+			// 	master into something else
+			SHA: *pullRequest.PullRequest.Head.Ref,
+		})
+
+	// Check each (added, modified, or removed) file in each commit
+	var commitScanResults []CommitScanResult
+	for _, commit := range commits {
+
+		commitScanResult := CommitScanResult { Commit: *commit.SHA }
+		for _, file := range commit.Files {
+			fileContentMatch, err := scanner.CheckFileContentFromCommit(
+				githubClient,
+				pullRequest.Repo.Owner.Login,
+				pullRequest.Repo.Name,
+				commit.Commit.SHA,
+				file.Filename)
+			if err != nil {
+				return nil, err
+			}
+
+			if len(fileContentMatch.LineMatches) > 0 {
+				commitScanResult.Matches = append(commitScanResult.Matches, *fileContentMatch)
+			}
+		}
+
+		if commitScanResult.HasMatches() {
+			commitScanResults = append(commitScanResults, commitScanResult)
+		}
+	}
+
+	result := PullRequestScanResult {
+		ContentMatch: *contentMatch,
+		Commits: commitScanResults,
+	}
+
+	return &result, nil
+}
+
+func (scanner *Scanner) CheckTextBody(body *string) (*ContentMatch, error) {
+	var result ContentMatch
+	contentResult, err := scanner.checkContent(body)
+	if err != nil {
+		return nil, err
+	}
+	if len(contentResult.LineMatches) > 0 {
+		result.LineMatches = contentResult.LineMatches
+	}
+
+	return &result, nil
 }

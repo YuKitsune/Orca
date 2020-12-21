@@ -41,10 +41,6 @@ type Match struct {
 	Kind       string
 }
 
-func (matches *ContentMatch) HasMatches() bool {
-	return len(matches.LineMatches) > 0
-}
-
 type Scanner struct {
 	Patterns []SearchPattern
 }
@@ -113,7 +109,7 @@ func (scanner *Scanner) CheckFileContent(file File) (*FileContentMatch, error) {
 		return nil, err
 	}
 
-	if contentResult.HasMatches() {
+	if len(contentResult.LineMatches) > 0 {
 		result.LineMatches = contentResult.LineMatches
 	}
 
