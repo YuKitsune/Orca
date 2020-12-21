@@ -121,10 +121,10 @@ func (matchHandler *MatchHandler) HandleMatchesFromIssueComment(issue *github.Is
 	return nil
 }
 
-func redactMatchesFromContent(content string, result *scanning.IssueScanResult, replacementCharacter rune) string {
+func redactMatchesFromContent(content string, lineMatches []scanning.LineMatch, replacementCharacter rune) string {
 
 	contentRunes := []rune(content)
-	for _, lineMatch := range result.LineMatches {
+	for _, lineMatch := range lineMatches {
 		lineNumber := lineMatch.LineNumber
 
 		// Skip to the specified line number
