@@ -19,46 +19,13 @@ func NewMatchHandler(gitHubApiClient *github.Client) *MatchHandler {
 	}
 }
 
-func (matchHandler *MatchHandler) HandleMatchesFromPush(pushPayload *github.PushEvent, results []scanning.CommitScanResult) error {
+func (matchHandler *MatchHandler) HandleMatchesFromPush(
+	pushPayload *github.PushEvent,
+	results []scanning.CommitScanResult) error {
 
 	// Open a new issue
-	var title string
-	if len(results) > 1 {
-		title = fmt.Sprintf("Potentially sensitive data found in %d commits", len(results))
-	} else {
-		title = "Potentially sensitive data found in a commit"
-	}
-
+	title, body := buildMessage(results)
 	log.Printf("Opening a new issue \"%s\"\n", title)
-
-	body := "Potentially sensitive data has recently been pushed to this repository.\n\n"
-
-	for _, result := range results {
-		body += fmt.Sprintf("Introduced in %s:\n", result.Commit)
-
-		// Add content matches
-		if len(result.Matches) > 0 {
-
-			body += "Files containing potentially sensitive data:\n"
-			for _, contentMatch := range result.Matches {
-
-				// Todo: Group lines which are directly below each other into one permalink (e.g. #L2-L4)
-				body += fmt.Sprintf("### %s\n", *contentMatch.Path)
-				for _, lineMatch := range contentMatch.LineMatches {
-
-					// TODO: Add a buffer around the line for extra context
-					var matchKinds []string
-					for _, match := range lineMatch.Matches {
-						matchKinds = append(matchKinds, match.Kind)
-					}
-
-					body += fmt.Sprintf("#### %s:", strings.Join(matchKinds, ", "))
-					body += fmt.Sprintf("%s#L%d\n", *contentMatch.PermalinkURL, lineMatch.LineNumber)
-				}
-			}
-		}
-	}
-
 	issue, _, err := matchHandler.GitHubApiClient.Issues.Create(
 		context.Background(),
 		*pushPayload.Repo.Owner.Login,
@@ -161,4 +128,49 @@ func redactMatchesFromContent(content string, lineMatches []scanning.LineMatch, 
 	contentString := string(contentRunes)
 
 	return contentString
+}
+
+func buildMessage(results []scanning.CommitScanResult) (string, string) {
+	var title string
+	var body string
+
+	if len(results) > 1 {
+		title = fmt.Sprintf("Potentially sensitive data found in %d commits", len(results))
+	} else {
+		title = "Potentially sensitive data found in a commit"
+	}
+
+	if len(results) > 1 {
+		body = fmt.Sprintf("Potentially sensitive data has been found in %d commits.\n\n", len(results))
+	} else {
+		body = "Potentially sensitive data has been found in a commit"
+	}
+
+	for _, result := range results {
+		body += fmt.Sprintf("Introduced in %s:\n", result.Commit)
+
+		// Add content matches
+		if len(result.Matches) > 0 {
+
+			body += "Files containing potentially sensitive data:\n"
+			for _, contentMatch := range result.Matches {
+
+				// Todo: Group lines which are directly below each other into one permalink (e.g. #L2-L4)
+				body += fmt.Sprintf("### %s\n", *contentMatch.Path)
+				for _, lineMatch := range contentMatch.LineMatches {
+
+					// TODO: Add a buffer around the line for extra context
+					var matchKinds []string
+					for _, match := range lineMatch.Matches {
+						matchKinds = append(matchKinds, match.Kind)
+					}
+
+					body += fmt.Sprintf("#### %s:", strings.Join(matchKinds, ", "))
+					body += fmt.Sprintf("%s#L%d\n", *contentMatch.PermalinkURL, lineMatch.LineNumber)
+				}
+			}
+		}
+	}
+
+	return title, body
 }
