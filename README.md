@@ -34,7 +34,7 @@
 ## Resources
 - Setting up the Development Environment: https://docs.github.com/en/free-pro-team@latest/developers/apps/setting-up-your-development-environment-to-create-a-github-app
 - GitHub WebHook Events and Payloads: https://docs.github.com/en/free-pro-team@latest/developers/webhooks-and-events/webhook-events-and-payloads
-- GitHub REST API library (Octokit): https://developer.github.com/v3/libraries/ 
+- GitHub REST API reference: https://docs.github.com/en/free-pro-team@latest/rest/reference 
 - Remediate sensitive data found in commits: https://stackoverflow.com/questions/872565/remove-sensitive-files-and-their-commits-from-git-history
 - Standard Go project layout: https://github.com/golang-standards/project-layout
 - CLI library: https://github.com/urfave/cli
