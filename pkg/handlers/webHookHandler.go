@@ -35,10 +35,21 @@ func NewWebhookHandler(
 
 func (webHookHandler *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	err := webHookHandler.handleWebHookRequest(r)
+	if err != nil {
+		http.Error(w, "failed to handle payload", http.StatusBadRequest)
+		log.Fatalf("failed to handle payload: %v", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (webHookHandler *WebhookHandler) handleWebHookRequest(r *http.Request) error {
+
 	// Gets the body as bytes and validates the signature
 	body, err := github.ValidatePayload(r, []byte(webHookHandler.secret))
 	if err != nil {
-		webHookHandler.HandleError(w, err)
+		return err
 	}
 
 	// NOTE: github.ParseWebHook will return a pointer to the webhook payload
@@ -46,15 +57,14 @@ func (webHookHandler *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	webHookType := github.WebHookType(r)
 	parsedPayload, err := github.ParseWebHook(webHookType, body)
 	if err != nil {
-		webHookHandler.HandleError(w, err)
+		return err
 	}
 
-	// TODO: Can this be automated?
 	switch payload := parsedPayload.(type) {
 	case *github.InstallationEvent:
 		payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 		if err != nil {
-			webHookHandler.HandleError(w, err)
+			return err
 		}
 
 		payloadHandler.HandleInstallation(payload)
@@ -62,7 +72,7 @@ func (webHookHandler *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 	case *github.PushEvent:
 		payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 		if err != nil {
-			webHookHandler.HandleError(w, err)
+			return err
 		}
 
 		payloadHandler.HandlePush(payload)
@@ -71,7 +81,7 @@ func (webHookHandler *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		if *payload.Action == "opened" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				webHookHandler.HandleError(w, err)
+				return err
 			}
 
 			payloadHandler.HandleIssue(payload)
@@ -81,7 +91,7 @@ func (webHookHandler *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		if *payload.Action == "created" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				webHookHandler.HandleError(w, err)
+				return err
 			}
 
 			payloadHandler.HandleIssueComment(payload)
@@ -91,7 +101,7 @@ func (webHookHandler *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		if *payload.Action == "opened" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				webHookHandler.HandleError(w, err)
+				return err
 			}
 
 			payloadHandler.HandlePullRequest(payload)
@@ -101,7 +111,7 @@ func (webHookHandler *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		if *payload.Action == "submitted" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				webHookHandler.HandleError(w, err)
+				return err
 			}
 
 			payloadHandler.HandlePullRequestReview(payload)
@@ -111,12 +121,14 @@ func (webHookHandler *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.R
 		if *payload.Action == "created" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
-				webHookHandler.HandleError(w, err)
+				return err
 			}
 
 			payloadHandler.HandlePullRequestReviewComment(payload)
 		}
 	}
+
+	return nil
 }
 
 func (webHookHandler *WebhookHandler) MakePayloadHandler(installationId *int64) (*PayloadHandler, error) {
@@ -126,9 +138,4 @@ func (webHookHandler *WebhookHandler) MakePayloadHandler(installationId *int64) 
 	}
 
 	return payloadHandler, nil
-}
-
-func (webHookHandler *WebhookHandler) HandleError(w http.ResponseWriter, err error) {
-	http.Error(w, "failed to handle payload", http.StatusBadRequest)
-	log.Fatalf("Error handling WebHook request: %v", err)
 }
