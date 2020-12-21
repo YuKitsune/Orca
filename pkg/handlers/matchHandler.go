@@ -92,6 +92,49 @@ func (matchHandler *MatchHandler) HandleMatchesFromIssueComment(
 	return nil
 }
 
+func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
+	request *github.PullRequestEvent,
+	result *scanning.PullRequestScanResult) error {
+
+	// Redact secrets from content
+	if len(result.ContentMatch.LineMatches) > 1 {
+		newBody := redactMatchesFromContent(*request.PullRequest.Body, result.LineMatches, '*')
+		_, _, err := matchHandler.GitHubApiClient.PullRequests.Edit(
+			context.Background(),
+			*request.Repo.Owner.Login,
+			*request.Repo.Name,
+			*request.PullRequest.Number,
+			&github.PullRequest{
+				Body: &newBody,
+			})
+		if err != nil {
+			return err
+		}
+		log.Printf("Matches from #%d redacted\n", request.PullRequest.Number)
+	}
+
+	// Reply to the PR with a summary of secrets
+	if len(result.Commits) > 1 {
+		_, body := buildMessage(result.Commits)
+		_, _, err := matchHandler.GitHubApiClient.PullRequests.CreateComment(
+			context.Background(),
+			*request.Repo.Owner.Login,
+			*request.Repo.Name,
+			*request.PullRequest.Number,
+			&github.PullRequestComment{
+				Body: &body,
+		    })
+		if err != nil {
+			return err
+		}
+		log.Printf("Warning comment added to #%d\n", request.PullRequest.Number)
+	}
+
+	// Todo: Add a failing check
+
+	return nil
+}
+
 func redactMatchesFromContent(content string, lineMatches []scanning.LineMatch, replacementCharacter rune) string {
 
 	contentRunes := []rune(content)

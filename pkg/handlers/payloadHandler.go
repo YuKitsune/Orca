@@ -129,10 +129,29 @@ func (handler *PayloadHandler) HandleIssueComment(issueCommentPayload *github.Is
 func (handler *PayloadHandler) HandlePullRequest(pullRequestPayload *github.PullRequestEvent) {
 
 	fmt.Println("Handling pull request...")
-	// Todo: 1. Scan pull request
-	// Todo: 2. Checkout tip of branch
-	// Todo: 3. Scan files
-	// Todo: 4. Scan any previously un-scanned commits on branch
+
+	// Check the Pull Request
+	pullRequestScanResult, err := handler.Scanner.CheckPullRequest(pullRequestPayload, handler.GitHubApiClient)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	if pullRequestScanResult.HasMatches() {
+		log.Println("Potentially sensitive information detected. Rectifying...")
+		matchHandler := NewMatchHandler(handler.GitHubApiClient)
+
+		// Reply to the PR
+		err := matchHandler.HandleMatchesFromPullRequest(pullRequestPayload, pullRequestScanResult)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+
+		log.Println("Pull Request has been addressed")
+	} else {
+		log.Println("No matches to address")
+	}
 }
 
 func (handler *PayloadHandler) HandlePullRequestReview(pullRequestReviewPayload *github.PullRequestReviewEvent) {
@@ -141,7 +160,8 @@ func (handler *PayloadHandler) HandlePullRequestReview(pullRequestReviewPayload 
 	// Todo: 1. Scan review content
 }
 
-func (handler *PayloadHandler) HandlePullRequestReviewComment(pullRequestReviewCommentPayload *github.PullRequestReviewCommentEvent) {
+func (handler *PayloadHandler) HandlePullRequestReviewComment(
+	pullRequestReviewCommentPayload *github.PullRequestReviewCommentEvent) {
 
 	fmt.Println("Handling pull request review comment...")
 	// Todo: 1. Scan review content
