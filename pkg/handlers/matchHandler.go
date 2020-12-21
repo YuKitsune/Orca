@@ -44,10 +44,12 @@ func (matchHandler *MatchHandler) HandleMatchesFromPush(
 	return nil
 }
 
-func (matchHandler *MatchHandler) HandleMatchesFromIssue(issue *github.IssuesEvent, result *scanning.IssueScanResult) error {
+func (matchHandler *MatchHandler) HandleMatchesFromIssue(
+	issue *github.IssuesEvent,
+	result *scanning.IssueScanResult) error {
 
 	log.Printf("Redacting matches from #%d\n", issue.Issue.Number)
-	newBody := redactMatchesFromContent(*issue.Issue.Body, result, '*')
+	newBody := redactMatchesFromContent(*issue.Issue.Body, result.LineMatches, '*')
 
 	// Replace the issue body with the new body with redacted matches
 	_, _, err := matchHandler.GitHubApiClient.Issues.Edit(
@@ -66,10 +68,12 @@ func (matchHandler *MatchHandler) HandleMatchesFromIssue(issue *github.IssuesEve
 	return nil
 }
 
-func (matchHandler *MatchHandler) HandleMatchesFromIssueComment(issue *github.IssueCommentEvent, result *scanning.IssueScanResult) error {
+func (matchHandler *MatchHandler) HandleMatchesFromIssueComment(
+	issue *github.IssueCommentEvent,
+	result *scanning.IssueScanResult) error {
 
 	log.Printf("Redacting matches from #%d (comment %d)\n", issue.Issue.Number, issue.Comment.ID)
-	newBody := redactMatchesFromContent(*issue.Comment.Body, result, '*')
+	newBody := redactMatchesFromContent(*issue.Comment.Body, result.LineMatches, '*')
 
 	// Replace the issue body with the new body with redacted matches
 	_, _, err := matchHandler.GitHubApiClient.Issues.EditComment(
