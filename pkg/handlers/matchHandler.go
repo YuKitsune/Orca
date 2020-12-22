@@ -182,16 +182,18 @@ func buildMessage(results []scanning.CommitScanResult) (string, string) {
 	var body string
 
 	if len(results) > 1 {
-		title = fmt.Sprintf("Potentially sensitive data found in %d commits", len(results))
+		title = fmt.Sprintf("Potentially sensitive data found in %d commits.", len(results))
 	} else {
-		title = "Potentially sensitive data found in a commit"
+		title = "Potentially sensitive data found in a commit."
 	}
 
 	if len(results) > 1 {
-		body = fmt.Sprintf("Potentially sensitive data has been found in %d commits.\n\n", len(results))
+		body = fmt.Sprintf("Potentially sensitive data has been found in %d commits.", len(results))
 	} else {
-		body = "Potentially sensitive data has been found in a commit"
+		body = "Potentially sensitive data has been found in a commit."
 	}
+
+	body += "\n\n"
 
 	for _, result := range results {
 		body += fmt.Sprintf("Introduced in %s:\n", result.Commit)
