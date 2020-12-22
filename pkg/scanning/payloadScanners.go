@@ -115,13 +115,33 @@ func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent, g
 	var commitScanResults []CommitScanResult
 	for _, commit := range commits {
 
+		// NOTE: ListCommits does not include any references to which files were changed (commit.Files is always nil),
+		//	so we need to send another request specifically for the commit
+		// TODO: Find a way around this to prevent getting rate limited
 		commitScanResult := CommitScanResult { Commit: *commit.SHA }
-		for _, file := range commit.Files {
+		commitWithFiles, _, err := githubClient.Repositories.GetCommit(
+			context.Background(),
+			*pullRequest.Repo.Owner.Login,
+			*pullRequest.Repo.Name,
+			*commit.SHA)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, file := range commitWithFiles.Files {
+
+			// Only care about added and modified files
+			if *file.Status != "added" && *file.Status != "modified" {
+				continue
+			}
+
+			log.Printf("Checking %s from %s", *file.Filename, *commit.SHA)
+
 			fileContentMatch, err := scanner.CheckFileContentFromCommit(
 				githubClient,
 				pullRequest.Repo.Owner.Login,
 				pullRequest.Repo.Name,
-				commit.Commit.SHA,
+				commit.SHA,
 				file.Filename)
 			if err != nil {
 				return nil, err
