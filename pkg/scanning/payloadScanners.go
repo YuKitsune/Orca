@@ -104,16 +104,12 @@ func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent, g
 	}
 
 	// Get a list of the commits on the PRs branch
-	commits, _, err := githubClient.Repositories.ListCommits(
+	commits, _, err := githubClient.PullRequests.ListCommits(
 		context.Background(),
 		*pullRequest.Repo.Owner.Login,
 		*pullRequest.Repo.Name,
-		&github.CommitsListOptions{
-
-			// TODO: this will get all commits on the PRs branch, but this won't be very good if we're making a PR from
-			// 	master into something else
-			SHA: *pullRequest.PullRequest.Head.Ref,
-		})
+		*pullRequest.PullRequest.Number,
+		nil)
 
 	// Check each (added, modified, or removed) file in each commit
 	var commitScanResults []CommitScanResult
