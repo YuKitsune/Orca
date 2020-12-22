@@ -97,7 +97,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
 	result *scanning.PullRequestScanResult) error {
 
 	// Redact secrets from content
-	if len(result.ContentMatch.LineMatches) > 1 {
+	if len(result.ContentMatch.LineMatches) > 0 {
 		newBody := redactMatchesFromContent(*request.PullRequest.Body, result.LineMatches, '*')
 		_, _, err := matchHandler.GitHubApiClient.PullRequests.Edit(
 			context.Background(),
@@ -114,7 +114,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
 	}
 
 	// Reply to the PR with a summary of secrets
-	if len(result.Commits) > 1 {
+	if len(result.Commits) > 0 {
 		_, body := buildMessage(result.Commits)
 		_, _, err := matchHandler.GitHubApiClient.PullRequests.CreateComment(
 			context.Background(),
