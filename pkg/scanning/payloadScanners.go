@@ -3,6 +3,7 @@ package scanning
 import (
 	"context"
 	"github.com/google/go-github/v33/github"
+	"log"
 )
 
 type Result interface {
@@ -23,7 +24,7 @@ type IssueScanResult struct {
 }
 
 func (result *IssueScanResult) HasMatches() bool {
-	return len(result.LineMatches) > 0
+	return result != nil && len(result.LineMatches) > 0
 }
 
 type PullRequestScanResult struct {

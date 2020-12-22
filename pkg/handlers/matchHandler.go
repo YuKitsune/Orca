@@ -132,8 +132,6 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
 		log.Printf("Warning comment added to #%d\n", request.PullRequest.Number)
 	}
 
-	// Todo: Add a failing check
-
 	return nil
 }
 
