@@ -116,12 +116,14 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
 	// Reply to the PR with a summary of secrets
 	if len(result.Commits) > 0 {
 		_, body := buildMessage(result.Commits)
-		_, _, err := matchHandler.GitHubApiClient.PullRequests.CreateComment(
+
+		// NOTE: PullRequests are apparently a form of issue, thus commenting on a pull request uses the issues API
+		_, _, err := matchHandler.GitHubApiClient.Issues.CreateComment(
 			context.Background(),
 			*request.Repo.Owner.Login,
 			*request.Repo.Name,
 			*request.PullRequest.Number,
-			&github.PullRequestComment{
+			&github.IssueComment{
 				Body: &body,
 		    })
 		if err != nil {
