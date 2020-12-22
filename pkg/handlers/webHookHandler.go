@@ -78,6 +78,10 @@ func (webHookHandler *WebhookHandler) handleWebHookRequest(r *http.Request) erro
 		payloadHandler.HandlePush(payload)
 
 	case *github.IssuesEvent:
+		if *payload.Sender.Type == "Bot" {
+			return nil
+		}
+
 		if *payload.Action == "opened" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
@@ -88,6 +92,10 @@ func (webHookHandler *WebhookHandler) handleWebHookRequest(r *http.Request) erro
 		}
 
 	case *github.IssueCommentEvent:
+		if *payload.Sender.Type == "Bot" {
+			return nil
+		}
+
 		if *payload.Action == "created" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
@@ -98,6 +106,10 @@ func (webHookHandler *WebhookHandler) handleWebHookRequest(r *http.Request) erro
 		}
 
 	case *github.PullRequestEvent:
+		if *payload.Sender.Type == "Bot" {
+			return nil
+		}
+
 		if *payload.Action == "opened" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
@@ -108,6 +120,10 @@ func (webHookHandler *WebhookHandler) handleWebHookRequest(r *http.Request) erro
 		}
 
 	case *github.PullRequestReviewEvent:
+		if *payload.Sender.Type == "Bot" {
+			return nil
+		}
+
 		if *payload.Action == "submitted" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
@@ -118,6 +134,10 @@ func (webHookHandler *WebhookHandler) handleWebHookRequest(r *http.Request) erro
 		}
 
 	case *github.PullRequestReviewCommentEvent:
+		if *payload.Sender.Type == "Bot" {
+			return nil
+		}
+
 		if *payload.Action == "created" || *payload.Action == "edited" {
 			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
 			if err != nil {
