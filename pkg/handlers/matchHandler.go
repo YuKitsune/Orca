@@ -24,7 +24,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromPush(
 	results []scanning.CommitScanResult) error {
 
 	// Open a new issue
-	title, body := buildMessage(results)
+	title, body := BuildMessage(results)
 	log.Printf("Opening a new issue \"%s\"\n", title)
 	issue, _, err := matchHandler.GitHubApiClient.Issues.Create(
 		context.Background(),
@@ -115,7 +115,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
 
 	// Reply to the PR with a summary of secrets
 	if len(result.Commits) > 0 {
-		_, body := buildMessage(result.Commits)
+		_, body := BuildMessage(result.Commits)
 
 		// NOTE: PullRequests are apparently a form of issue, thus commenting on a pull request uses the issues API
 		_, _, err := matchHandler.GitHubApiClient.Issues.CreateComment(
@@ -177,7 +177,7 @@ func redactMatchesFromContent(content string, lineMatches []scanning.LineMatch, 
 	return contentString
 }
 
-func buildMessage(results []scanning.CommitScanResult) (string, string) {
+func BuildMessage(results []scanning.CommitScanResult) (string, string) {
 	var title string
 	var body string
 

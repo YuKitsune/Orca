@@ -146,6 +146,16 @@ func (webHookHandler *WebhookHandler) handleWebHookRequest(r *http.Request) erro
 
 			payloadHandler.HandlePullRequestReviewComment(payload)
 		}
+
+	case *github.CheckSuiteEvent:
+		if *payload.Action == "requested" || *payload.Action == "rerequested" {
+			payloadHandler, err := webHookHandler.MakePayloadHandler(payload.Installation.ID)
+			if err != nil {
+				return err
+			}
+
+			payloadHandler.HandleCheckSuite(payload)
+		}
 	}
 
 	return nil

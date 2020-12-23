@@ -113,17 +113,35 @@ func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent, g
 		nil)
 
 	// Check each (added, modified, or removed) file in each commit
+	commitScanResults, err := scanner.CheckCommits(pullRequest.Repo, githubClient, commits)
+	if err != nil {
+		return nil, err
+	}
+
+	result := PullRequestScanResult{
+		ContentMatch: *contentMatch,
+		Commits:      commitScanResults,
+	}
+
+	return &result, nil
+}
+
+func (scanner *Scanner) CheckCommits(
+	repo *github.Repository,
+	githubClient *github.Client,
+	commits []*github.RepositoryCommit) ([]CommitScanResult, error) {
+
 	var commitScanResults []CommitScanResult
 	for _, commit := range commits {
 
 		// NOTE: ListCommits does not include any references to which files were changed (commit.Files is always nil),
 		//	so we need to send another request specifically for the commit
 		// TODO: Find a way around this to prevent getting rate limited
-		commitScanResult := CommitScanResult { Commit: *commit.SHA }
+		commitScanResult := CommitScanResult{Commit: *commit.SHA}
 		commitWithFiles, _, err := githubClient.Repositories.GetCommit(
 			context.Background(),
-			*pullRequest.Repo.Owner.Login,
-			*pullRequest.Repo.Name,
+			*repo.Owner.Login,
+			*repo.Name,
 			*commit.SHA)
 		if err != nil {
 			return nil, err
@@ -140,8 +158,8 @@ func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent, g
 
 			fileContentMatch, err := scanner.CheckFileContentFromCommit(
 				githubClient,
-				pullRequest.Repo.Owner.Login,
-				pullRequest.Repo.Name,
+				repo.Owner.Login,
+				repo.Name,
 				commit.SHA,
 				file.Filename)
 			if err != nil {
@@ -157,13 +175,7 @@ func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent, g
 			commitScanResults = append(commitScanResults, commitScanResult)
 		}
 	}
-
-	result := PullRequestScanResult {
-		ContentMatch: *contentMatch,
-		Commits: commitScanResults,
-	}
-
-	return &result, nil
+	return commitScanResults, nil
 }
 
 func (scanner *Scanner) CheckTextBody(body *string) (*ContentMatch, error) {
