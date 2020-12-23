@@ -62,6 +62,7 @@ func (handler *PayloadHandler) HandlePush(pushPayload *github.PushEvent) {
 
 	// If anything shows up in the results, take action
 	if len(commitScanResults) > 0 {
+		log.Println("Potentially sensitive information detected. Rectifying...")
 		matchHandler := NewMatchHandler(handler.GitHubApiClient)
 		err := matchHandler.HandleMatchesFromPush(pushPayload, commitScanResults)
 		if err != nil {
@@ -87,6 +88,7 @@ func (handler *PayloadHandler) HandleIssue(issuePayload *github.IssuesEvent) {
 
 	// If anything shows up in the results, take action
 	if issueScanResult.HasMatches() {
+		log.Println("Potentially sensitive information detected. Rectifying...")
 		matchHandler := NewMatchHandler(handler.GitHubApiClient)
 		err := matchHandler.HandleMatchesFromIssue(issuePayload, issueScanResult)
 		if err != nil {
@@ -127,21 +129,19 @@ func (handler *PayloadHandler) HandleIssueComment(issueCommentPayload *github.Is
 }
 
 func (handler *PayloadHandler) HandlePullRequest(pullRequestPayload *github.PullRequestEvent) {
+	log.Println("Handling pull request...")
 
-	fmt.Println("Handling pull request...")
-
-	// Check the Pull Request
-	pullRequestScanResult, err := handler.Scanner.CheckPullRequest(pullRequestPayload, handler.GitHubApiClient)
+	// Check the contents of the pull request
+	pullRequestScanResult, err := handler.Scanner.CheckPullRequest(pullRequestPayload)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
+	// If anything shows up in the results, take action
 	if pullRequestScanResult.HasMatches() {
 		log.Println("Potentially sensitive information detected. Rectifying...")
 		matchHandler := NewMatchHandler(handler.GitHubApiClient)
-
-		// Reply to the PR
 		err := matchHandler.HandleMatchesFromPullRequest(pullRequestPayload, pullRequestScanResult)
 		if err != nil {
 			log.Fatal(err)

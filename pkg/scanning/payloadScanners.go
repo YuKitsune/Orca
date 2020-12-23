@@ -1,9 +1,7 @@
 package scanning
 
 import (
-	"context"
 	"github.com/google/go-github/v33/github"
-	"log"
 )
 
 type Result interface {
@@ -29,11 +27,10 @@ func (result *IssueScanResult) HasMatches() bool {
 
 type PullRequestScanResult struct {
 	ContentMatch
-	Commits []CommitScanResult
 }
 
 func (result *PullRequestScanResult) HasMatches() bool {
-	return len(result.LineMatches) > 0 || len(result.Commits) > 0
+	return len(result.LineMatches) > 0
 }
 
 func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.Client) ([]CommitScanResult, error) {
@@ -83,20 +80,22 @@ func (scanner *Scanner) CheckIssueComment(issueComment *github.IssueCommentEvent
 }
 
 func (scanner *Scanner) checkIssueBody(body *string) (*IssueScanResult, error) {
+	var issueScanResult IssueScanResult
 	result, err := scanner.CheckTextBody(body)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(result.LineMatches) > 1 {
-		issueResult := IssueScanResult{*result}
-		return &issueResult, nil
+	if len(issueScanResult.LineMatches) > 0 {
+		issueScanResult.ContentMatch = *result
 	}
 
-	return nil, nil
+	return &issueScanResult, nil
 }
 
-func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent, githubClient *github.Client) (*PullRequestScanResult, error) {
+func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent) (*PullRequestScanResult, error) {
+
+	// NOTE: commits are checked via a CI check, see checkSuiteHandler.go
 
 	// Check the Pull Request body
 	contentMatch, err := scanner.CheckTextBody(pullRequest.PullRequest.Body)
@@ -104,24 +103,8 @@ func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent, g
 		return nil, err
 	}
 
-	// Get a list of the commits on the PRs branch
-	commits, _, err := githubClient.PullRequests.ListCommits(
-		context.Background(),
-		*pullRequest.Repo.Owner.Login,
-		*pullRequest.Repo.Name,
-		*pullRequest.PullRequest.Number,
-		nil)
-
-	// Check each (added, modified, or removed) file in each commit
-	commitScanResults, err := scanner.CheckCommits(pullRequest.Repo, githubClient, commits)
-	if err != nil {
-		return nil, err
-	}
-
 	result := PullRequestScanResult{
 		ContentMatch: *contentMatch,
-		Commits:      commitScanResults,
-	}
 	}
 
 	return &result, nil

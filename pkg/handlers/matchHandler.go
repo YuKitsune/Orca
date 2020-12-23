@@ -96,41 +96,23 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
 	request *github.PullRequestEvent,
 	result *scanning.PullRequestScanResult) error {
 
-	// Redact secrets from content
-	if len(result.ContentMatch.LineMatches) > 0 {
-		newBody := redactMatchesFromContent(*request.PullRequest.Body, result.LineMatches, '*')
-		_, _, err := matchHandler.GitHubApiClient.PullRequests.Edit(
-			context.Background(),
-			*request.Repo.Owner.Login,
-			*request.Repo.Name,
-			*request.PullRequest.Number,
-			&github.PullRequest{
-				Body: &newBody,
-			})
-		if err != nil {
-			return err
-		}
-		log.Printf("Matches from #%d redacted\n", request.PullRequest.Number)
-	}
+	log.Printf("Redacting matches from #%d\n", request.PullRequest.Number)
 
-	// Reply to the PR with a summary of secrets
-	if len(result.Commits) > 0 {
-		_, body := BuildMessage(result.Commits)
+	newBody := redactMatchesFromContent(*request.PullRequest.Body, result.LineMatches, '*')
 
-		// NOTE: PullRequests are apparently a form of issue, thus commenting on a pull request uses the issues API
-		_, _, err := matchHandler.GitHubApiClient.Issues.CreateComment(
-			context.Background(),
-			*request.Repo.Owner.Login,
-			*request.Repo.Name,
-			*request.PullRequest.Number,
-			&github.IssueComment{
-				Body: &body,
-			})
-		if err != nil {
-			return err
-		}
-		log.Printf("Warning comment added to #%d\n", request.PullRequest.Number)
+	// Replace the pull request body with new body with redacted matches
+	_, _, err := matchHandler.GitHubApiClient.PullRequests.Edit(
+		context.Background(),
+		*request.Repo.Owner.Login,
+		*request.Repo.Name,
+		*request.PullRequest.Number,
+		&github.PullRequest{
+			Body: &newBody,
+		})
+	if err != nil {
+		return err
 	}
+	log.Printf("Matches from #%d redacted\n", request.PullRequest.Number)
 
 	return nil
 }
