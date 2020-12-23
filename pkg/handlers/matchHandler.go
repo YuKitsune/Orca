@@ -31,9 +31,9 @@ func (matchHandler *MatchHandler) HandleMatchesFromPush(
 		*pushPayload.Repo.Owner.Login,
 		*pushPayload.Repo.Name,
 		&github.IssueRequest{
-			Title:     &title,
-			Body:      &body,
-			Assignee:  pushPayload.Pusher.Name,
+			Title:    &title,
+			Body:     &body,
+			Assignee: pushPayload.Pusher.Name,
 		})
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromIssue(
 		*issue.Issue.Repository.Owner.Login,
 		*issue.Issue.Repository.Name,
 		*issue.Issue.Number,
-		&github.IssueRequest {
+		&github.IssueRequest{
 			Body: &newBody,
 		})
 	if err != nil {
@@ -125,7 +125,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
 			*request.PullRequest.Number,
 			&github.IssueComment{
 				Body: &body,
-		    })
+			})
 		if err != nil {
 			return err
 		}

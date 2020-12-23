@@ -47,7 +47,7 @@ func getInstallationAccessToken(installationId int64, appId int, privateKey *rsa
 	return tokenResponse.Token, nil
 }
 
-func getAppJsonWebToken(appId int, privatKey *rsa.PrivateKey) (*string, error){
+func getAppJsonWebToken(appId int, privatKey *rsa.PrivateKey) (*string, error) {
 
 	// Build the JWT
 	token := jwt.New(jwt.GetSigningMethod("RS256"))
@@ -66,10 +66,10 @@ func getAppJsonWebToken(appId int, privatKey *rsa.PrivateKey) (*string, error){
 }
 
 func getHttpClientWithInjectedToken(token string) http.Client {
-	httpClient := http.Client {
-		Transport: &authorizedTransport {
+	httpClient := http.Client{
+		Transport: &authorizedTransport{
 			underlyingTransport: http.DefaultTransport,
-			bearerToken: token,
+			bearerToken:         token,
 		},
 	}
 

@@ -3,8 +3,8 @@ package scanning
 import "regexp"
 
 type SearchPattern struct {
-	Pattern string
-	Kind  string
+	Pattern    string
+	Kind       string
 	Exclusions []string
 }
 

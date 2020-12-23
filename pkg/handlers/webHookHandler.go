@@ -9,11 +9,11 @@ import (
 )
 
 type WebhookHandler struct {
-	Path string
-	AppId int
+	Path         string
+	AppId        int
 	PatternStore *scanning.PatternStore
-	privateKey *rsa.PrivateKey
-	secret string
+	privateKey   *rsa.PrivateKey
+	secret       string
 }
 
 func NewWebhookHandler(

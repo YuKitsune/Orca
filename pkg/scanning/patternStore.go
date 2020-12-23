@@ -44,7 +44,7 @@ func NewPatternStore(patternsLocation string) (PatternStore, error) {
 		// Todo
 		return nil, errors.New("fetching patterns from a URL is not yet implemented")
 	} else if fileExists(patternsLocation) {
-		store := &FilePatternStore { PatternsJsonFile: patternsLocation }
+		store := &FilePatternStore{PatternsJsonFile: patternsLocation}
 		return store, nil
 	} else {
 		errorMessage := fmt.Sprintf("unsupported patterns location \"%s\"\n", patternsLocation)

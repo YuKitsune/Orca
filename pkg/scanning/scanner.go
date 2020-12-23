@@ -8,15 +8,15 @@ import (
 )
 
 type File struct {
-	Path    *string
-	Content *string
-	HTMLURL *string
+	Path         *string
+	Content      *string
+	HTMLURL      *string
 	PermalinkURL *string
 }
 
 type FileMatch struct {
 	File
-	Kind string
+	Kind  string
 	Error error
 }
 
@@ -52,7 +52,7 @@ func NewScanner(patternStore *PatternStore) (*Scanner, error) {
 		return nil, err
 	}
 
-	scanner := &Scanner {
+	scanner := &Scanner{
 		Patterns: patterns,
 	}
 
@@ -73,7 +73,7 @@ func (scanner *Scanner) CheckFileContentFromCommit(
 		*repoOwner,
 		*repoName,
 		*filePath,
-		&github.RepositoryContentGetOptions {
+		&github.RepositoryContentGetOptions{
 			Ref: *commit,
 		})
 	if err != nil {
@@ -88,10 +88,10 @@ func (scanner *Scanner) CheckFileContentFromCommit(
 
 	permalinkUrl := *content.HTMLURL
 
-	file := File {
-		Path:    content.Path,
-		Content: &contentString,
-		HTMLURL: content.HTMLURL,
+	file := File{
+		Path:         content.Path,
+		Content:      &contentString,
+		HTMLURL:      content.HTMLURL,
 		PermalinkURL: &permalinkUrl,
 	}
 
@@ -100,7 +100,7 @@ func (scanner *Scanner) CheckFileContentFromCommit(
 
 func (scanner *Scanner) CheckFileContent(file File) (*FileContentMatch, error) {
 
-	result := FileContentMatch {
+	result := FileContentMatch{
 		File: file,
 	}
 
@@ -130,7 +130,7 @@ func (scanner *Scanner) checkContent(content *string) (*ContentMatch, error) {
 
 		if len(matchesOnLine) > 0 {
 			var lineMatches = LineMatch{
-				LineNumber: i+1,
+				LineNumber: i + 1,
 				Matches:    matchesOnLine,
 			}
 
@@ -138,7 +138,7 @@ func (scanner *Scanner) checkContent(content *string) (*ContentMatch, error) {
 		}
 	}
 
- 	return &result, nil
+	return &result, nil
 }
 
 func (scanner *Scanner) scanLineForPatterns(line string) ([]Match, error) {
@@ -163,7 +163,7 @@ func scanLineForPattern(line string, pattern SearchPattern) ([]Match, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var regexMatches = regex.FindAllStringIndex(line, -1)
 	for _, match := range regexMatches {
 		var startIndex = match[0]

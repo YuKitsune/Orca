@@ -47,7 +47,7 @@ func DecodePrivateKey(raw []byte) (*rsa.PrivateKey, error) {
 func EncodePrivateKey(privateKey *rsa.PrivateKey) []byte {
 	bytes := pem.EncodeToMemory(
 		&pem.Block{
-			Type: blockType,
+			Type:  blockType,
 			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
 		},
 	)

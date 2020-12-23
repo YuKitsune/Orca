@@ -41,7 +41,7 @@ func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.C
 	var commitScanResults []CommitScanResult
 	for _, commit := range push.Commits {
 
-		var commitScanResult = CommitScanResult {
+		var commitScanResult = CommitScanResult{
 			Commit: *commit.ID,
 		}
 

@@ -13,7 +13,7 @@ type PayloadHandler struct {
 	InstallationId  int64
 	AppId           int
 	GitHubApiClient *github.Client
-	Scanner 		*scanning.Scanner
+	Scanner         *scanning.Scanner
 }
 
 func NewPayloadHandler(
@@ -36,7 +36,7 @@ func NewPayloadHandler(
 		InstallationId:  installationId,
 		AppId:           appId,
 		GitHubApiClient: gitHubApiClient,
-		Scanner: scanner,
+		Scanner:         scanner,
 	}
 
 	return &handler, nil
