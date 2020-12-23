@@ -60,7 +60,6 @@ func NewScanner(patternStore *PatternStore) (*Scanner, error) {
 	return scanner, nil
 }
 
-
 func (scanner *Scanner) CheckCommits(
 	repo *github.Repository,
 	githubClient *github.Client,

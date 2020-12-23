@@ -117,6 +117,63 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
 	return nil
 }
 
+func (matchHandler *MatchHandler) HandleMatchesFromPullRequestReview(
+	request *github.PullRequestReviewEvent,
+	result *scanning.PullRequestReviewScanResult) error {
+
+	log.Printf("Redacting matches from #%d (review %d)\n", request.PullRequest.Number, request.Review.ID)
+
+	newBody := redactMatchesFromContent(*request.Review.Body, result.LineMatches, '*')
+
+	// Replace the pull request body with new body with redacted matches
+	_, _, err := matchHandler.GitHubApiClient.PullRequests.UpdateReview(
+		context.Background(),
+		*request.Repo.Owner.Login,
+		*request.Repo.Name,
+		*request.PullRequest.Number,
+		*request.Review.ID,
+		newBody)
+	if err != nil {
+		return err
+	}
+	log.Printf("Matches from #%d redacted (review %d)\n", request.PullRequest.Number, request.Review.ID)
+
+	return nil
+}
+
+func (matchHandler *MatchHandler) HandleMatchesFromPullRequestReviewComment(
+	request *github.PullRequestReviewCommentEvent,
+	result *scanning.PullRequestReviewCommentScanResult) error {
+
+	log.Printf(
+		"Redacting matches from #%d (review %d, comment %d)\n",
+		request.PullRequest.Number,
+		request.Comment.InReplyTo,
+		request.Comment.ID)
+
+	newBody := redactMatchesFromContent(*request.Comment.Body, result.LineMatches, '*')
+
+	// Replace the pull request body with new body with redacted matches
+	_, _, err := matchHandler.GitHubApiClient.PullRequests.EditComment(
+		context.Background(),
+		*request.Repo.Owner.Login,
+		*request.Repo.Name,
+		*request.Comment.ID,
+		&github.PullRequestComment{
+			Body: &newBody,
+		})
+	if err != nil {
+		return err
+	}
+	log.Printf(
+		"Matches from #%d redacted (review %d, comment %d)\n",
+		request.PullRequest.Number,
+		request.Comment.InReplyTo,
+		request.Comment.ID)
+
+	return nil
+}
+
 func redactMatchesFromContent(content string, lineMatches []scanning.LineMatch, replacementCharacter rune) string {
 
 	contentRunes := []rune(content)

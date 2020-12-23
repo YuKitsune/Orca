@@ -33,6 +33,22 @@ func (result *PullRequestScanResult) HasMatches() bool {
 	return len(result.LineMatches) > 0
 }
 
+type PullRequestReviewScanResult struct {
+	ContentMatch
+}
+
+func (result *PullRequestReviewScanResult) HasMatches() bool {
+	return len(result.LineMatches) > 0
+}
+
+type PullRequestReviewCommentScanResult struct {
+	ContentMatch
+}
+
+func (result *PullRequestReviewCommentScanResult) HasMatches() bool {
+	return len(result.LineMatches) > 0
+}
+
 func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.Client) ([]CommitScanResult, error) {
 
 	var commitScanResults []CommitScanResult
@@ -104,6 +120,38 @@ func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent) (
 	}
 
 	result := PullRequestScanResult{
+		ContentMatch: *contentMatch,
+	}
+
+	return &result, nil
+}
+
+func (scanner *Scanner) CheckPullRequestReview(
+	pullRequestReview *github.PullRequestReviewEvent) (*PullRequestReviewScanResult, error) {
+
+	// Check the Pull Request Review body
+	contentMatch, err := scanner.CheckTextBody(pullRequestReview.Review.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := PullRequestReviewScanResult{
+		ContentMatch: *contentMatch,
+	}
+
+	return &result, nil
+}
+
+func (scanner *Scanner) CheckPullRequestReviewComment(
+	pullRequestReviewComment *github.PullRequestReviewCommentEvent) (*PullRequestReviewCommentScanResult, error) {
+
+	// Check the Pull Request Review Comment body
+	contentMatch, err := scanner.CheckTextBody(pullRequestReviewComment.Comment.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := PullRequestReviewCommentScanResult{
 		ContentMatch: *contentMatch,
 	}
 

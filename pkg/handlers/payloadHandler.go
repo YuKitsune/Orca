@@ -148,21 +148,63 @@ func (handler *PayloadHandler) HandlePullRequest(pullRequestPayload *github.Pull
 			return
 		}
 
-		log.Println("Pull Request has been addressed")
+		log.Println("Pull request has been addressed")
 	} else {
 		log.Println("No matches to address")
 	}
 }
 
 func (handler *PayloadHandler) HandlePullRequestReview(pullRequestReviewPayload *github.PullRequestReviewEvent) {
-
 	fmt.Println("Handling pull request review...")
-	// Todo: 1. Scan review content
+
+	// Check the contents of the pull request review
+	pullRequestReviewScanResult, err := handler.Scanner.CheckPullRequestReview(pullRequestReviewPayload)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	// If anything shows up in the results, take action
+	if pullRequestReviewScanResult.HasMatches() {
+		log.Println("Potentially sensitive information detected. Rectifying...")
+		matchHandler := NewMatchHandler(handler.GitHubApiClient)
+		err := matchHandler.HandleMatchesFromPullRequestReview(pullRequestReviewPayload, pullRequestReviewScanResult)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+
+		log.Println("Pull request review has been addressed")
+	} else {
+		log.Println("No matches to address")
+	}
 }
 
 func (handler *PayloadHandler) HandlePullRequestReviewComment(
 	pullRequestReviewCommentPayload *github.PullRequestReviewCommentEvent) {
-
 	fmt.Println("Handling pull request review comment...")
-	// Todo: 1. Scan review content
+
+	// Check the contents of the pull request review
+	pullRequestReviewCommentScanResult, err := handler.Scanner.CheckPullRequestReviewComment(pullRequestReviewCommentPayload)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	// If anything shows up in the results, take action
+	if pullRequestReviewCommentScanResult.HasMatches() {
+		log.Println("Potentially sensitive information detected. Rectifying...")
+		matchHandler := NewMatchHandler(handler.GitHubApiClient)
+		err := matchHandler.HandleMatchesFromPullRequestReviewComment(
+			pullRequestReviewCommentPayload,
+			pullRequestReviewCommentScanResult)
+		if err != nil {
+			log.Fatal(err)
+			return
+		}
+
+		log.Println("Pull request review comment has been addressed")
+	} else {
+		log.Println("No matches to address")
+	}
 }
