@@ -18,7 +18,7 @@ const (
 	checkRunConclusionFailure checkRunConclusion = "failure"
 )
 
-// BUG: This will trigger a failure even if the issue has been fixed
+// BUG: This will trigger a failure even if the issue has been fixed in a more recent commit
 
 func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckSuiteEvent) {
 	fmt.Println("Handling Check Suite request...")
@@ -44,7 +44,6 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 	checkRun.CheckSuite.Repository = checkSuitePayload.Repo
 
 	// Execute the check
-	// TODO: Checks currently only supported on Pull Requests, need to find a better way to deal with this
 	if len(checkSuitePayload.CheckSuite.PullRequests) > 0 {
 		for _, pullRequest := range checkSuitePayload.CheckSuite.PullRequests {
 			commits, _, err := handler.GitHubApiClient.PullRequests.ListCommits(
@@ -133,7 +132,7 @@ func (handler *PayloadHandler) updateCheckRun(
 		})
 
 	if err != nil {
-		// TODO: At this point we're going to have a dangling check,
+		// TODO: At this point we're going to have an abandoned check,
 		// 	need to persist these checks somewhere so we can clean them up after a failure
 		log.Fatalf("Could not mark check run as failed: %v", err)
 	}

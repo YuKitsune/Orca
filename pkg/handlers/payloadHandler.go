@@ -48,8 +48,6 @@ func (handler *PayloadHandler) HandleInstallation(installationPayload *github.In
 	// 	May not be viable for large repositories with a long history
 }
 
-// Todo: Move payload conversion outside of this file
-
 func (handler *PayloadHandler) HandlePush(pushPayload *github.PushEvent) {
 	log.Println("Handling push...")
 

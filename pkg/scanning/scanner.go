@@ -83,7 +83,7 @@ func (scanner *Scanner) CheckCommits(
 
 		for _, file := range commitWithFiles.Files {
 
-			// Only care about added and modified files
+			// Can only scan contents of added and modified files
 			if *file.Status != "added" && *file.Status != "modified" {
 				continue
 			}
