@@ -2,6 +2,7 @@ package scanning
 
 import (
 	"github.com/google/go-github/v33/github"
+	"sort"
 )
 
 type Result interface {
@@ -52,6 +53,12 @@ func (result *PullRequestReviewCommentScanResult) HasMatches() bool {
 func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.Client) ([]CommitScanResult, error) {
 
 	var commitScanResults []CommitScanResult
+
+	// Sort the commits by their date
+	sort.Slice(push.Commits, func(i, j int) bool {
+		return push.Commits[i].Timestamp.Unix() < push.Commits[j].Timestamp.Unix()
+	})
+
 	for _, commit := range push.Commits {
 
 		var commitScanResult = CommitScanResult{

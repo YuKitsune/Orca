@@ -40,6 +40,7 @@ type Match struct {
 	EndIndex   int
 	value      string
 	Kind       string
+	Resolved bool
 }
 
 type Scanner struct {
@@ -83,6 +84,24 @@ func (scanner *Scanner) CheckCommits(
 
 		for _, file := range commitWithFiles.Files {
 
+			// If the file was removed, then mark any previous matches as resolved
+			// Todo: Fix the nesting!!!
+			if *file.Status == "removed" {
+				for _, previousScanResult := range commitScanResults {
+					for _, previousFileMatch := range previousScanResult.Matches {
+						if previousFileMatch.Path == file.Filename {
+							for _, previousLineMatch := range previousFileMatch.LineMatches {
+								for _, previousMatch := range previousLineMatch.Matches {
+									previousMatch.Resolved = true
+								}
+							}
+						}
+					}
+				}
+
+				continue
+			}
+
 			// Can only scan contents of added and modified files
 			if *file.Status != "added" && *file.Status != "modified" {
 				continue
@@ -100,8 +119,23 @@ func (scanner *Scanner) CheckCommits(
 				return nil, err
 			}
 
+			// Remove any already known matches
+			fileContentMatch = RemoveKnownMatches(GetMatches(commitScanResults), *fileContentMatch)
 			if len(fileContentMatch.LineMatches) > 0 {
 				commitScanResult.Matches = append(commitScanResult.Matches, *fileContentMatch)
+			} else {
+				// No matches, all previous matches are also probably resolved
+				for _, previousScanResult := range commitScanResults {
+					for _, previousFileMatch := range previousScanResult.Matches {
+						if previousFileMatch.Path == file.Filename {
+							for _, previousLineMatch := range previousFileMatch.LineMatches {
+								for _, previousMatch := range previousLineMatch.Matches {
+									previousMatch.Resolved = true
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 
@@ -109,6 +143,7 @@ func (scanner *Scanner) CheckCommits(
 			commitScanResults = append(commitScanResults, commitScanResult)
 		}
 	}
+
 	return commitScanResults, nil
 }
 
@@ -251,3 +286,68 @@ func scanLineForPattern(line string, pattern SearchPattern) ([]Match, error) {
 
 	return matches, nil
 }
+
+func GetMatches(commitScanResults []CommitScanResult) []FileContentMatch{
+	var result []FileContentMatch
+	for _, commitScanResult := range commitScanResults {
+		result = append(result, commitScanResult.Matches...)
+	}
+
+	return result
+}
+
+func RemoveKnownMatches(knownFileContentMatches []FileContentMatch, newFileContentMatch FileContentMatch) *FileContentMatch {
+
+	// Find the indexes of matches we already know about
+	// Todo: Please for the love of god find a better way to do this without creating a skate park
+	var matchesToRemove [][]int
+	for _, knownFileContentMatch := range knownFileContentMatches {
+		if knownFileContentMatch.Path == newFileContentMatch.Path {
+			for _, knownLineMatch := range knownFileContentMatch.LineMatches {
+				for i, newLineMatch := range newFileContentMatch.LineMatches {
+					for _, knownMatch := range knownLineMatch.Matches {
+						for j, newMatch := range newLineMatch.Matches {
+							if newMatch.value == knownMatch.value {
+								matchesToRemove = append(matchesToRemove, []int{i, j})
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Copy the new results and remove the matches so we can manually add the ones we care about
+	// Todo: Is this assignment by value or reference?
+	resultingMatch := newFileContentMatch
+	resultingMatch.LineMatches = []LineMatch{}
+	if len(matchesToRemove) > 0 {
+
+		// Note: Because the index of each match will be moved back by 1 each time we remove something,
+		//	the index of the item to remove needs to be moved back by 1 for each iteration
+		//	We can use the index of the current loop to help us
+		//  Example:
+		//  First iteration,  0 changes,          index 5 stays as is
+		//  Second iteration, 1 previous change,  index 6 moved to 5
+		//  Third iteration,  2 previous changes, index 7 moved to 5
+
+		for i, indexOfLineMatch := range matchesToRemove {
+
+			lineMatch := newFileContentMatch.LineMatches[i]
+			for j, indexOfMatch := range indexOfLineMatch {
+				indexToRemove := indexOfMatch - j
+				lineMatch.Matches = append(lineMatch.Matches[:indexToRemove], lineMatch.Matches[indexToRemove+1:]...)
+			}
+
+			if len(lineMatch.Matches) > 0 {
+				resultingMatch.LineMatches = append(resultingMatch.LineMatches, lineMatch)
+			}
+		}
+	}
+
+	return &resultingMatch
+}
+
+// File removed: 							Keep match, mark as resolved
+// Match no longer present in new commit:	Keep old match, mark as resolved
+// Match is present in new commit:			Remove new match, old match has required data
