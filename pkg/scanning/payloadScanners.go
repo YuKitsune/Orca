@@ -19,35 +19,35 @@ func (result *CommitScanResult) HasMatches() bool {
 }
 
 type IssueScanResult struct {
-	ContentMatch
+	Matches []LineMatch
 }
 
 func (result *IssueScanResult) HasMatches() bool {
-	return result != nil && len(result.LineMatches) > 0
+	return result != nil && len(result.Matches) > 0
 }
 
 type PullRequestScanResult struct {
-	ContentMatch
+	Matches []LineMatch
 }
 
 func (result *PullRequestScanResult) HasMatches() bool {
-	return len(result.LineMatches) > 0
+	return len(result.Matches) > 0
 }
 
 type PullRequestReviewScanResult struct {
-	ContentMatch
+	Matches []LineMatch
 }
 
 func (result *PullRequestReviewScanResult) HasMatches() bool {
-	return len(result.LineMatches) > 0
+	return len(result.Matches) > 0
 }
 
 type PullRequestReviewCommentScanResult struct {
-	ContentMatch
+	Matches []LineMatch
 }
 
 func (result *PullRequestReviewCommentScanResult) HasMatches() bool {
-	return len(result.LineMatches) > 0
+	return len(result.Matches) > 0
 }
 
 func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.Client) ([]CommitScanResult, error) {
@@ -71,7 +71,7 @@ func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.C
 
 		// Check file contents
 		for _, filePath := range filesToCheck {
-			contentScanResults, err := scanner.CheckFileContentFromCommit(
+			matches, err := scanner.CheckFileContentFromCommit(
 				githubClient,
 				push.Repo.Owner.Login,
 				push.Repo.Name,
@@ -81,8 +81,8 @@ func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.C
 				return nil, err
 			}
 
-			if len(contentScanResults.LineMatches) > 0 {
-				commitScanResult.Matches = append(commitScanResult.Matches, *contentScanResults)
+			if len(matches) > 0 {
+				commitScanResult.Matches = append(commitScanResult.Matches, matches...)
 			}
 		}
 
@@ -95,25 +95,33 @@ func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.C
 }
 
 func (scanner *Scanner) CheckIssue(issue *github.IssuesEvent) (*IssueScanResult, error) {
-	return scanner.checkIssueBody(issue.Issue.Body)
-}
 
-func (scanner *Scanner) CheckIssueComment(issueComment *github.IssueCommentEvent) (*IssueScanResult, error) {
-	return scanner.checkIssueBody(issueComment.Comment.Body)
-}
-
-func (scanner *Scanner) checkIssueBody(body *string) (*IssueScanResult, error) {
-	var issueScanResult IssueScanResult
-	result, err := scanner.CheckTextBody(body)
+	// Check the Issue body
+	matches, err := scanner.CheckContent(issue.Issue.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(issueScanResult.LineMatches) > 0 {
-		issueScanResult.ContentMatch = *result
+	result := IssueScanResult{
+		Matches: matches,
 	}
 
-	return &issueScanResult, nil
+	return &result, nil
+}
+
+func (scanner *Scanner) CheckIssueComment(issueComment *github.IssueCommentEvent) (*IssueScanResult, error) {
+
+	// Check the Issue Comment body
+	matches, err := scanner.CheckContent(issueComment.Comment.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := IssueScanResult{
+		Matches: matches,
+	}
+
+	return &result, nil
 }
 
 func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent) (*PullRequestScanResult, error) {
@@ -121,13 +129,13 @@ func (scanner *Scanner) CheckPullRequest(pullRequest *github.PullRequestEvent) (
 	// NOTE: commits are checked via a CI check, see checkSuiteHandler.go
 
 	// Check the Pull Request body
-	contentMatch, err := scanner.CheckTextBody(pullRequest.PullRequest.Body)
+	matches, err := scanner.CheckContent(pullRequest.PullRequest.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	result := PullRequestScanResult{
-		ContentMatch: *contentMatch,
+		Matches: matches,
 	}
 
 	return &result, nil
@@ -137,13 +145,13 @@ func (scanner *Scanner) CheckPullRequestReview(
 	pullRequestReview *github.PullRequestReviewEvent) (*PullRequestReviewScanResult, error) {
 
 	// Check the Pull Request Review body
-	contentMatch, err := scanner.CheckTextBody(pullRequestReview.Review.Body)
+	matches, err := scanner.CheckContent(pullRequestReview.Review.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	result := PullRequestReviewScanResult{
-		ContentMatch: *contentMatch,
+		Matches: matches,
 	}
 
 	return &result, nil
@@ -153,13 +161,13 @@ func (scanner *Scanner) CheckPullRequestReviewComment(
 	pullRequestReviewComment *github.PullRequestReviewCommentEvent) (*PullRequestReviewCommentScanResult, error) {
 
 	// Check the Pull Request Review Comment body
-	contentMatch, err := scanner.CheckTextBody(pullRequestReviewComment.Comment.Body)
+	matches, err := scanner.CheckContent(pullRequestReviewComment.Comment.Body)
 	if err != nil {
 		return nil, err
 	}
 
 	result := PullRequestReviewCommentScanResult{
-		ContentMatch: *contentMatch,
+		Matches: matches,
 	}
 
 	return &result, nil
