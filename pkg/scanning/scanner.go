@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
+type FileContentMatch struct {
+	File
+	LineMatch
+}
+
 type File struct {
 	Path         *string
 	Content      *string
 	HTMLURL      *string
 	PermalinkURL *string
-}
-
-type FileContentMatch struct {
-	File
-	LineMatch
 }
 
 type LineMatch struct {
@@ -30,7 +30,7 @@ type Match struct {
 	EndIndex   int
 	value      string
 	Kind       string
-	Resolved bool
+	Resolved   bool
 }
 
 type Scanner struct {
@@ -271,7 +271,7 @@ func scanLineForPattern(line string, pattern SearchPattern) ([]Match, error) {
 	return matches, nil
 }
 
-func getMatches(commitScanResults []CommitScanResult) []FileContentMatch{
+func getMatches(commitScanResults []CommitScanResult) []FileContentMatch {
 	var result []FileContentMatch
 	for _, commitScanResult := range commitScanResults {
 		result = append(result, commitScanResult.Matches...)
