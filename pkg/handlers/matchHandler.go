@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/google/go-github/v33/github"
 	"log"
-	"strings"
 )
 
 type MatchHandler struct {
@@ -49,7 +48,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromIssue(
 	result *scanning.IssueScanResult) error {
 
 	log.Printf("Redacting matches from #%d\n", issue.Issue.Number)
-	newBody := redactMatchesFromContent(*issue.Issue.Body, result.LineMatches, '*')
+	newBody := redactMatchesFromContent(*issue.Issue.Body, result.Matches, '*')
 
 	// Replace the issue body with the new body with redacted matches
 	_, _, err := matchHandler.GitHubApiClient.Issues.Edit(
@@ -73,7 +72,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromIssueComment(
 	result *scanning.IssueScanResult) error {
 
 	log.Printf("Redacting matches from #%d (comment %d)\n", issue.Issue.Number, issue.Comment.ID)
-	newBody := redactMatchesFromContent(*issue.Comment.Body, result.LineMatches, '*')
+	newBody := redactMatchesFromContent(*issue.Comment.Body, result.Matches, '*')
 
 	// Replace the issue body with the new body with redacted matches
 	_, _, err := matchHandler.GitHubApiClient.Issues.EditComment(
@@ -98,7 +97,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequest(
 
 	log.Printf("Redacting matches from #%d\n", request.PullRequest.Number)
 
-	newBody := redactMatchesFromContent(*request.PullRequest.Body, result.LineMatches, '*')
+	newBody := redactMatchesFromContent(*request.PullRequest.Body, result.Matches, '*')
 
 	// Replace the pull request body with new body with redacted matches
 	_, _, err := matchHandler.GitHubApiClient.PullRequests.Edit(
@@ -123,7 +122,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequestReview(
 
 	log.Printf("Redacting matches from #%d (review %d)\n", request.PullRequest.Number, request.Review.ID)
 
-	newBody := redactMatchesFromContent(*request.Review.Body, result.LineMatches, '*')
+	newBody := redactMatchesFromContent(*request.Review.Body, result.Matches, '*')
 
 	// Replace the pull request body with new body with redacted matches
 	_, _, err := matchHandler.GitHubApiClient.PullRequests.UpdateReview(
@@ -151,7 +150,7 @@ func (matchHandler *MatchHandler) HandleMatchesFromPullRequestReviewComment(
 		request.Comment.InReplyTo,
 		request.Comment.ID)
 
-	newBody := redactMatchesFromContent(*request.Comment.Body, result.LineMatches, '*')
+	newBody := redactMatchesFromContent(*request.Comment.Body, result.Matches, '*')
 
 	// Replace the pull request body with new body with redacted matches
 	_, _, err := matchHandler.GitHubApiClient.PullRequests.EditComment(
@@ -197,10 +196,8 @@ func redactMatchesFromContent(content string, lineMatches []scanning.LineMatch, 
 			if currentLineNumber == lineNumber {
 
 				// Check if the current index on the line is within the range of one of the matches
-				for _, match := range lineMatch.Matches {
-					if indexInLine >= match.StartIndex && indexInLine < match.EndIndex {
-						contentRunes[i] = replacementCharacter
-					}
+				if indexInLine >= lineMatch.StartIndex && indexInLine < lineMatch.EndIndex {
+					contentRunes[i] = replacementCharacter
 				}
 			}
 
@@ -235,28 +232,21 @@ func BuildMessage(results []scanning.CommitScanResult) (string, string) {
 	body += "\n\n"
 
 	for _, result := range results {
-		body += fmt.Sprintf("Introduced in %s:\n", result.Commit)
 
-		// Add content matches
+		// Add matches
 		if len(result.Matches) > 0 {
 
+			body += fmt.Sprintf("Introduced in %s:\n", result.Commit)
 			body += "Files containing potentially sensitive data:\n"
-			for _, contentMatch := range result.Matches {
+			for _, match := range result.Matches {
 
 				// Todo: Group lines which are directly below each other into one permalink (e.g. #L2-L4)
-				body += fmt.Sprintf("### %s\n", *contentMatch.Path)
-				for _, lineMatch := range contentMatch.LineMatches {
-
-					// TODO: Add a buffer around the line for extra context
-					var matchKinds []string
-					for _, match := range lineMatch.Matches {
-						matchKinds = append(matchKinds, match.Kind)
-					}
-
-					body += fmt.Sprintf("#### %s:", strings.Join(matchKinds, ", "))
-					body += fmt.Sprintf("%s#L%d\n", *contentMatch.PermalinkURL, lineMatch.LineNumber)
-				}
+				body += fmt.Sprintf("### %s:\n", match.Kind)
+				body += fmt.Sprintf("`%s`\n", *match.Path)
+				body += fmt.Sprintf("%s#L%d\n", *match.PermalinkURL, match.LineNumber)
 			}
+
+			body += "\n\n"
 		}
 	}
 
