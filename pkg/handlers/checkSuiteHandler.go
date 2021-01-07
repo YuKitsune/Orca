@@ -26,7 +26,7 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 	// Create a new Check Run
 	fmt.Println("Creating new check run")
 	inProgressString := string(checkRunStatusInProgress)
-	checkRun, _, err := handler.GitHubApiClient.Checks.CreateCheckRun(
+	checkRun, _, err := handler.GitHubClient.Checks.CreateCheckRun(
 		context.Background(),
 		*checkSuitePayload.Repo.Owner.Login,
 		*checkSuitePayload.Repo.Name,
@@ -46,7 +46,7 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 	// Execute the check
 	if len(checkSuitePayload.CheckSuite.PullRequests) > 0 {
 		for _, pullRequest := range checkSuitePayload.CheckSuite.PullRequests {
-			commits, _, err := handler.GitHubApiClient.PullRequests.ListCommits(
+			commits, _, err := handler.GitHubClient.PullRequests.ListCommits(
 				context.Background(),
 				*checkSuitePayload.Repo.Owner.Login,
 				*checkSuitePayload.Repo.Name,
@@ -57,6 +57,9 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 				return
 			}
 
+			// Note: Timestamp not available in these commits for some reason (but they are in the Push event???)
+			//	Have to assume the commits are in the correct order.
+
 			// Get a list of commit SHAs
 			var commitSHAs []string
 			for _, commit := range commits {
@@ -66,7 +69,7 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 			commitScanResults, err := handler.Scanner.CheckCommits(
 				checkSuitePayload.Repo.Owner.Login,
 				checkSuitePayload.Repo.Name,
-				handler.GitHubApiClient,
+				handler.GitHubClient,
 				commitSHAs)
 			if err != nil {
 				handler.handleFailure(checkRun, "Failed to scan commits from Pull Request", err)
@@ -126,7 +129,7 @@ func (handler *PayloadHandler) updateCheckRun(
 	conclusionString := string(conclusion)
 	outputTitle := "Orca Checks"
 
-	_, _, err := handler.GitHubApiClient.Checks.UpdateCheckRun(
+	_, _, err := handler.GitHubClient.Checks.UpdateCheckRun(
 		context.Background(),
 		*checkRun.CheckSuite.Repository.Owner.Login,
 		*checkRun.CheckSuite.Repository.Name,
