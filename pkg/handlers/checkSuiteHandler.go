@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"Orca/pkg/scanning"
 	"context"
 	"fmt"
 	"github.com/google/go-github/v33/github"
@@ -77,9 +78,41 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 			}
 
 			if len(commitScanResults) > 0 {
-				log.Printf("Potentially sensitive information detected in pull request #%d. Failing check.\n", pullRequest.Number)
+
+				// Todo: Once scan results are persisted, only act on new scan results
+
+				// If all matches are resolved, pass the check, but reply with a reminder that the matches can still be
+				//	viewed in the commit history
+				var conclusion checkRunConclusion
+				if AllMatchesAreResolved(commitScanResults) {
+					log.Printf("Matches found but resolved in pull request #%d. Passing check with reminder.\n", pullRequest.Number)
+					conclusion = checkRunConclusionSuccess
+
+					// Reply with reminder
+					body := "## :warning: Heads up!\n"
+					body += "It looks like there is _potentially_ sensitive information in the commit history, but it appears to have since been removed.\n"
+					body += fmt.Sprintf("See the [Orca check results](%s) for more information.\n", *checkRun.HTMLURL)
+					body += "If any sensitive information is in the history, please make sure it is addressed appropriately." // Todo: Reword this line
+					_, _, err := handler.GitHubClient.Issues.CreateComment(
+						context.Background(),
+						*checkSuitePayload. Repo.Owner.Login,
+						*checkSuitePayload.Repo.Name,
+						*pullRequest.Number,
+						&github.IssueComment {
+							Body: &body,
+						})
+					if err != nil {
+						handler.handleFailure(checkRun, "Failed to reply to Pull Request with commit history warning", err)
+						return
+					}
+				} else {
+					log.Printf("Potentially sensitive information detected in pull request #%d. Failing check.\n", pullRequest.Number)
+					conclusion = checkRunConclusionFailure
+				}
+
 				title, text := BuildMessage(commitScanResults)
-				handler.completeCheckRun(checkRun, checkRunConclusionFailure, title, &text)
+				handler.completeCheckRun(checkRun, conclusion, title, &text)
+
 				return
 			} else {
 				log.Printf("No matches to address in pull request #%d.\n", pullRequest.Number)
@@ -95,7 +128,6 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 			"No Pull Requests found. Orca Checks are currently only supported from Pull Requests",
 			nil)
 		log.Println("No pull requests. Skipping.")
-		return
 	}
 }
 
@@ -149,4 +181,16 @@ func (handler *PayloadHandler) updateCheckRun(
 		// 	need to persist these checks somewhere so we can clean them up after a failure
 		log.Fatalf("Could not mark check run as failed: %v", err)
 	}
+}
+
+func AllMatchesAreResolved(scanResults []scanning.CommitScanResult) bool {
+	for _, result := range scanResults {
+		for _, match := range result.Matches {
+			if !match.Resolved {
+				return false
+			}
+		}
+	}
+
+	return true
 }
