@@ -10,10 +10,10 @@ import (
 )
 
 type PayloadHandler struct {
-	InstallationId  int64
-	AppId           int
-	GitHubApiClient *github.Client
-	Scanner         *scanning.Scanner
+	InstallationId int64
+	AppId          int
+	GitHubClient   *github.Client
+	Scanner        *scanning.Scanner
 }
 
 func NewPayloadHandler(
@@ -33,10 +33,10 @@ func NewPayloadHandler(
 	}
 
 	handler := PayloadHandler{
-		InstallationId:  installationId,
-		AppId:           appId,
-		GitHubApiClient: gitHubApiClient,
-		Scanner:         scanner,
+		InstallationId: installationId,
+		AppId:          appId,
+		GitHubClient:   gitHubApiClient,
+		Scanner:        scanner,
 	}
 
 	return &handler, nil
@@ -52,7 +52,7 @@ func (handler *PayloadHandler) HandlePush(pushPayload *github.PushEvent) {
 	log.Println("Handling push...")
 
 	// Check the commits
-	commitScanResults, err := handler.Scanner.CheckPush(pushPayload, handler.GitHubApiClient)
+	commitScanResults, err := handler.Scanner.CheckPush(pushPayload, handler.GitHubClient)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -61,7 +61,7 @@ func (handler *PayloadHandler) HandlePush(pushPayload *github.PushEvent) {
 	// If anything shows up in the results, take action
 	if len(commitScanResults) > 0 {
 		log.Println("Potentially sensitive information detected. Rectifying...")
-		matchHandler := NewMatchHandler(handler.GitHubApiClient)
+		matchHandler := NewMatchHandler(handler.GitHubClient)
 		err := matchHandler.HandleMatchesFromPush(pushPayload, commitScanResults)
 		if err != nil {
 			log.Fatal(err)
@@ -87,7 +87,7 @@ func (handler *PayloadHandler) HandleIssue(issuePayload *github.IssuesEvent) {
 	// If anything shows up in the results, take action
 	if issueScanResult.HasMatches() {
 		log.Println("Potentially sensitive information detected. Rectifying...")
-		matchHandler := NewMatchHandler(handler.GitHubApiClient)
+		matchHandler := NewMatchHandler(handler.GitHubClient)
 		err := matchHandler.HandleMatchesFromIssue(issuePayload, issueScanResult)
 		if err != nil {
 			log.Fatal(err)
@@ -113,7 +113,7 @@ func (handler *PayloadHandler) HandleIssueComment(issueCommentPayload *github.Is
 	// If anything shows up in the results, take action
 	if issueScanResult.HasMatches() {
 		log.Println("Potentially sensitive information detected. Rectifying...")
-		matchHandler := NewMatchHandler(handler.GitHubApiClient)
+		matchHandler := NewMatchHandler(handler.GitHubClient)
 		err := matchHandler.HandleMatchesFromIssueComment(issueCommentPayload, issueScanResult)
 		if err != nil {
 			log.Fatal(err)
@@ -139,7 +139,7 @@ func (handler *PayloadHandler) HandlePullRequest(pullRequestPayload *github.Pull
 	// If anything shows up in the results, take action
 	if pullRequestScanResult.HasMatches() {
 		log.Println("Potentially sensitive information detected. Rectifying...")
-		matchHandler := NewMatchHandler(handler.GitHubApiClient)
+		matchHandler := NewMatchHandler(handler.GitHubClient)
 		err := matchHandler.HandleMatchesFromPullRequest(pullRequestPayload, pullRequestScanResult)
 		if err != nil {
 			log.Fatal(err)
@@ -165,7 +165,7 @@ func (handler *PayloadHandler) HandlePullRequestReview(pullRequestReviewPayload 
 	// If anything shows up in the results, take action
 	if pullRequestReviewScanResult.HasMatches() {
 		log.Println("Potentially sensitive information detected. Rectifying...")
-		matchHandler := NewMatchHandler(handler.GitHubApiClient)
+		matchHandler := NewMatchHandler(handler.GitHubClient)
 		err := matchHandler.HandleMatchesFromPullRequestReview(pullRequestReviewPayload, pullRequestReviewScanResult)
 		if err != nil {
 			log.Fatal(err)
@@ -192,7 +192,7 @@ func (handler *PayloadHandler) HandlePullRequestReviewComment(
 	// If anything shows up in the results, take action
 	if pullRequestReviewCommentScanResult.HasMatches() {
 		log.Println("Potentially sensitive information detected. Rectifying...")
-		matchHandler := NewMatchHandler(handler.GitHubApiClient)
+		matchHandler := NewMatchHandler(handler.GitHubClient)
 		err := matchHandler.HandleMatchesFromPullRequestReviewComment(
 			pullRequestReviewCommentPayload,
 			pullRequestReviewCommentScanResult)
