@@ -57,7 +57,17 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 				return
 			}
 
-			commitScanResults, err := handler.Scanner.CheckCommits(checkSuitePayload.Repo, handler.GitHubApiClient, commits)
+			// Get a list of commit SHAs
+			var commitSHAs []string
+			for _, commit := range commits {
+				commitSHAs = append(commitSHAs, *commit.SHA)
+			}
+
+			commitScanResults, err := handler.Scanner.CheckCommits(
+				checkSuitePayload.Repo.Owner.Login,
+				checkSuitePayload.Repo.Name,
+				handler.GitHubApiClient,
+				commitSHAs)
 			if err != nil {
 				handler.handleFailure(checkRun, "Failed to scan commits from Pull Request", err)
 				return

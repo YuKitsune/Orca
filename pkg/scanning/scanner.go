@@ -52,22 +52,23 @@ func NewScanner(patternStore *PatternStore) (*Scanner, error) {
 }
 
 func (scanner *Scanner) CheckCommits(
-	repo *github.Repository,
+	repoOwner *string,
+	repoName *string,
 	githubClient *github.Client,
-	commits []*github.RepositoryCommit) ([]CommitScanResult, error) {
+	commitSHAs []string) ([]CommitScanResult, error) {
 
 	var commitScanResults []CommitScanResult
-	for _, commit := range commits {
+	for _, commitSHA := range commitSHAs {
 
 		// NOTE: ListCommits does not include any references to which files were changed (commit.Files is always nil),
 		//	so we need to send another request specifically for the commit
 		// TODO: Find a way around this to prevent getting rate limited
-		commitScanResult := CommitScanResult{Commit: *commit.SHA}
+		commitScanResult := CommitScanResult{Commit: commitSHA}
 		commitWithFiles, _, err := githubClient.Repositories.GetCommit(
 			context.Background(),
-			*repo.Owner.Login,
-			*repo.Name,
-			*commit.SHA)
+			*repoOwner,
+			*repoName,
+			commitSHA)
 		if err != nil {
 			return nil, err
 		}
@@ -92,13 +93,13 @@ func (scanner *Scanner) CheckCommits(
 				continue
 			}
 
-			log.Printf("Checking %s from %s", *file.Filename, *commit.SHA)
+			log.Printf("Checking %s from %s", *file.Filename, commitSHA)
 
 			fileContentMatches, err := scanner.CheckFileContentFromCommit(
 				githubClient,
-				repo.Owner.Login,
-				repo.Name,
-				commit.SHA,
+				repoOwner,
+				repoName,
+				&commitSHA,
 				file.Filename)
 			if err != nil {
 				return nil, err

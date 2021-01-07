@@ -52,46 +52,18 @@ func (result *PullRequestReviewCommentScanResult) HasMatches() bool {
 
 func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.Client) ([]CommitScanResult, error) {
 
-	var commitScanResults []CommitScanResult
-
 	// Sort the commits by their date
 	sort.Slice(push.Commits, func(i, j int) bool {
 		return push.Commits[i].Timestamp.Unix() < push.Commits[j].Timestamp.Unix()
 	})
 
+	// Get a list of commit SHAs
+	var commitSHAs []string
 	for _, commit := range push.Commits {
-
-		var commitScanResult = CommitScanResult{
-			Commit: *commit.ID,
-		}
-
-		// Only want to check added or modified files
-		// Deleted files should already have been checked before hand
-		var filesToCheck = append(commit.Added, commit.Modified...)
-
-		// Check file contents
-		for _, filePath := range filesToCheck {
-			matches, err := scanner.CheckFileContentFromCommit(
-				githubClient,
-				push.Repo.Owner.Login,
-				push.Repo.Name,
-				commit.ID,
-				&filePath)
-			if err != nil {
-				return nil, err
-			}
-
-			if len(matches) > 0 {
-				commitScanResult.Matches = append(commitScanResult.Matches, matches...)
-			}
-		}
-
-		if commitScanResult.HasMatches() {
-			commitScanResults = append(commitScanResults, commitScanResult)
-		}
+		commitSHAs = append(commitSHAs, *commit.ID)
 	}
 
-	return commitScanResults, nil
+	return scanner.CheckCommits(push.Repo.Owner.Login, push.Repo.Name, githubClient, commitSHAs)
 }
 
 func (scanner *Scanner) CheckIssue(issue *github.IssuesEvent) (*IssueScanResult, error) {
