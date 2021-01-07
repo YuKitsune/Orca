@@ -76,10 +76,10 @@ func (scanner *Scanner) CheckCommits(
 
 			// If the file was removed, then mark any previous matches as resolved
 			if *file.Status == "removed" {
-				for _, previousScanResult := range commitScanResults {
-					for _, previousFileMatch := range previousScanResult.Matches {
-						if previousFileMatch.Path == file.Filename {
-							previousFileMatch.Resolved = true
+				for i, previousScanResult := range commitScanResults {
+					for j, previousFileMatch := range previousScanResult.Matches {
+						if *previousFileMatch.Path == *file.Filename {
+							commitScanResults[i].Matches[j].Resolved = true
 						}
 					}
 				}
@@ -116,10 +116,10 @@ func (scanner *Scanner) CheckCommits(
 			} else {
 
 				// No matches found, previous matches in this file should be resolved
-				for _, previousScanResult := range commitScanResults {
-					for _, previousFileMatch := range previousScanResult.Matches {
-						if previousFileMatch.Path == file.Filename {
-							previousFileMatch.Resolved = true
+				for i, previousScanResult := range commitScanResults {
+					for j, previousFileMatch := range previousScanResult.Matches {
+						if *previousFileMatch.Path == *file.Filename {
+							commitScanResults[i].Matches[j].Resolved = true
 						}
 					}
 				}
@@ -282,7 +282,7 @@ func getMatches(commitScanResults []CommitScanResult) []FileContentMatch {
 
 func MatchIsKnown(knownFileContentMatches []FileContentMatch, newFileContentMatch FileContentMatch) bool {
 	for _, knownFileContentMatch := range knownFileContentMatches {
-		if knownFileContentMatch.Path == newFileContentMatch.Path {
+		if *knownFileContentMatch.Path == *newFileContentMatch.Path {
 			if newFileContentMatch.value == knownFileContentMatch.value &&
 				!knownFileContentMatch.Resolved {
 				return true
