@@ -62,16 +62,45 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 			//	Have to assume the commits are in the correct order.
 
 			// Get a list of commit SHAs
-			var commitSHAs []string
+			var fileQueries []scanning.GitHubFileQuery
 			for _, commit := range commits {
-				commitSHAs = append(commitSHAs, *commit.SHA)
+				commitSha := commit.SHA
+
+				// Todo: Files from commit not available in commit list, need another request...
+				commitWithFiles, _, err := handler.GitHubClient.Repositories.GetCommit(
+					context.Background(),
+					*checkSuitePayload.Repo.Owner.Login,
+					*checkSuitePayload.Repo.Name,
+					*commitSha)
+				if err != nil {
+					handler.handleFailure(checkRun, "Failed to get commit from Pull Request", err)
+					return
+				}
+
+				for _, file := range commitWithFiles.Files {
+					var fileStatus scanning.FileState
+					switch *file.Status {
+					case "added":
+						fileStatus = scanning.FileAdded
+					case "modified":
+						fileStatus = scanning.FileModified
+					case "removed":
+						fileStatus = scanning.FileRemoved
+					}
+
+					fileQueries = append(fileQueries, scanning.GitHubFileQuery{
+						RepoOwner: *checkSuitePayload.Repo.Owner.Login,
+						RepoName:  *checkSuitePayload.Repo.Name,
+						CommitSHA: *commitSha,
+						FileName:  *file.Filename,
+						Status:    fileStatus,
+					})
+				}
 			}
 
-			commitScanResults, err := handler.Scanner.CheckCommits(
-				checkSuitePayload.Repo.Owner.Login,
-				checkSuitePayload.Repo.Name,
+			commitScanResults, err := handler.Scanner.CheckFileContentFromQueries(
 				handler.GitHubClient,
-				commitSHAs)
+				fileQueries)
 			if err != nil {
 				handler.handleFailure(checkRun, "Failed to scan commits from Pull Request", err)
 				return
