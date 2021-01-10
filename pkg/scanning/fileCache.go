@@ -3,8 +3,8 @@ package scanning
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"github.com/google/go-github/v33/github"
+	"log"
 )
 
 var (
@@ -27,6 +27,7 @@ type File struct {
 	Status       FileState
 }
 
+// Todo: If this is going to run as a serverless application, then this may need to be replaced with something like Redis or Memcached
 type fileCache struct {
 	files []File
 }
@@ -93,7 +94,7 @@ func GetFile(query GitHubFileQuery, client *github.Client) (*File, error) {
 
 		// If the file was not removed, then we can go ahead and get it's content and permalink
 		if query.Status != FileRemoved {
-			fmt.Printf("%s from %s not available in cache, fetching from API\n", query.FileName, query.CommitSHA)
+			log.Printf("%s from %s not available in cache, fetching from API\n", query.FileName, query.CommitSHA)
 			content, _, _, err := client.Repositories.GetContents(
 				context.Background(),
 				query.RepoOwner,
@@ -118,7 +119,7 @@ func GetFile(query GitHubFileQuery, client *github.Client) (*File, error) {
 
 		cache.addFile(*file)
 	} else {
-		fmt.Printf("%s from %s fetched from cache\n", query.FileName, query.CommitSHA)
+		log.Printf("%s from %s fetched from cache\n", query.FileName, query.CommitSHA)
 	}
 
 	return file, nil

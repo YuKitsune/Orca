@@ -22,10 +22,10 @@ const (
 // BUG: This will trigger a failure even if the issue has been fixed in a more recent commit
 
 func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckSuiteEvent) {
-	fmt.Println("Handling Check Suite request...")
+	log.Println("Handling Check Suite request...")
 
 	// Create a new Check Run
-	fmt.Println("Creating new check run")
+	log.Println("Creating new check run")
 	inProgressString := string(checkRunStatusInProgress)
 	checkRun, _, err := handler.GitHubClient.Checks.CreateCheckRun(
 		context.Background(),

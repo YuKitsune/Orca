@@ -153,7 +153,7 @@ func (handler *PayloadHandler) HandlePullRequest(pullRequestPayload *github.Pull
 }
 
 func (handler *PayloadHandler) HandlePullRequestReview(pullRequestReviewPayload *github.PullRequestReviewEvent) {
-	fmt.Println("Handling pull request review...")
+	log.Println("Handling pull request review...")
 
 	// Check the contents of the pull request review
 	pullRequestReviewScanResult, err := handler.Scanner.CheckPullRequestReview(pullRequestReviewPayload)
@@ -180,7 +180,7 @@ func (handler *PayloadHandler) HandlePullRequestReview(pullRequestReviewPayload 
 
 func (handler *PayloadHandler) HandlePullRequestReviewComment(
 	pullRequestReviewCommentPayload *github.PullRequestReviewCommentEvent) {
-	fmt.Println("Handling pull request review comment...")
+	log.Println("Handling pull request review comment...")
 
 	// Check the contents of the pull request review
 	pullRequestReviewCommentScanResult, err := handler.Scanner.CheckPullRequestReviewComment(pullRequestReviewCommentPayload)
