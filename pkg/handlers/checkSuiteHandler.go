@@ -124,10 +124,10 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 					body += "If any sensitive information is in the history, please make sure it is addressed appropriately." // Todo: Reword this line
 					_, _, err := handler.GitHubClient.Issues.CreateComment(
 						context.Background(),
-						*checkSuitePayload. Repo.Owner.Login,
+						*checkSuitePayload.Repo.Owner.Login,
 						*checkSuitePayload.Repo.Name,
 						*pullRequest.Number,
-						&github.IssueComment {
+						&github.IssueComment{
 							Body: &body,
 						})
 					if err != nil {

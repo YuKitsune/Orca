@@ -11,6 +11,7 @@ var (
 )
 
 type FileState string
+
 const (
 	FileAdded    FileState = "added"
 	FileModified FileState = "modified"
@@ -83,10 +84,10 @@ func GetFile(query GitHubFileQuery, client *github.Client) (*File, error) {
 	// If not in the cache, then send a request and cache the result for later
 	if file == nil {
 
-		file = &File {
-			CommitSHA:    query.CommitSHA,
-			Path:         query.FileName,
-			Status: query.Status,
+		file = &File{
+			CommitSHA: query.CommitSHA,
+			Path:      query.FileName,
+			Status:    query.Status,
 		}
 
 		// If the file was not removed, then we can go ahead and get it's content and permalink
