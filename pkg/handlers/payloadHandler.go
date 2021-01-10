@@ -4,7 +4,6 @@ import (
 	"Orca/pkg/api"
 	"Orca/pkg/scanning"
 	"crypto/rsa"
-	"fmt"
 	"github.com/google/go-github/v33/github"
 	"log"
 )
