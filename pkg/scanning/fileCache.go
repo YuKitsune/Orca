@@ -3,6 +3,7 @@ package scanning
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"github.com/google/go-github/v33/github"
 )
 
@@ -92,6 +93,7 @@ func GetFile(query GitHubFileQuery, client *github.Client) (*File, error) {
 
 		// If the file was not removed, then we can go ahead and get it's content and permalink
 		if query.Status != FileRemoved {
+			fmt.Printf("%s from %s not available in cache, fetching from API\n", query.FileName, query.CommitSHA)
 			content, _, _, err := client.Repositories.GetContents(
 				context.Background(),
 				query.RepoOwner,
@@ -115,6 +117,8 @@ func GetFile(query GitHubFileQuery, client *github.Client) (*File, error) {
 		}
 
 		cache.addFile(*file)
+	} else {
+		fmt.Printf("%s from %s fetched from cache\n", query.FileName, query.CommitSHA)
 	}
 
 	return file, nil
