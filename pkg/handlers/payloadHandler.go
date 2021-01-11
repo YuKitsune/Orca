@@ -3,6 +3,7 @@ package handlers
 import (
 	"Orca/pkg/api"
 	"Orca/pkg/scanning"
+	"context"
 	"crypto/rsa"
 	"fmt"
 	"github.com/google/go-github/v33/github"
@@ -50,6 +51,21 @@ func (handler *PayloadHandler) HandleInstallation(installationPayload *github.In
 
 func (handler *PayloadHandler) HandlePush(pushPayload *github.PushEvent) {
 	log.Println("Handling push...")
+
+	// If any Pull Requests are open for ths branch, then ignore this and let the CI check handle it
+	pullRequests, _, err := handler.GitHubClient.PullRequests.List(
+		context.Background(),
+		*pushPayload.Repo.Owner.Login,
+		*pushPayload.Repo.Name,
+		&github.PullRequestListOptions{
+			State:       "open",
+			Head:        fmt.Sprintf("%s:%s", *pushPayload.Pusher.Name, *pushPayload.Ref),
+		})
+
+	if len(pullRequests) > 0 {
+		log.Printf("Pull Request already exists for %s, skipping check on push.\n", *pushPayload.Ref)
+		return
+	}
 
 	// Check the commits
 	commitScanResults, err := handler.Scanner.CheckPush(pushPayload, handler.GitHubClient)
