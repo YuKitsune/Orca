@@ -11,13 +11,13 @@ var (
 	cache *fileCache
 )
 
-type FileState string
-
 const (
 	FileAdded    FileState = "added"
 	FileModified FileState = "modified"
 	FileRemoved  FileState = "removed"
 )
+
+type FileState string
 
 type File struct {
 	CommitSHA    string
@@ -32,16 +32,6 @@ type fileCache struct {
 	files []File
 }
 
-func getFileCache() *fileCache {
-	if cache == nil {
-		cache = &fileCache{
-			files: []File{},
-		}
-	}
-
-	return cache
-}
-
 func (cache *fileCache) addFile(file File) {
 
 	// Remove any conflicting file
@@ -54,15 +44,14 @@ func (cache *fileCache) addFile(file File) {
 	cache.files = append(cache.files, file)
 }
 
-func (cache *fileCache) getFilesFromCommit(commitSHA string) []*File {
-	var results []*File
-	for _, file := range cache.files {
-		if file.CommitSHA == commitSHA {
-			results = append(results, &file)
+func getFileCache() *fileCache {
+	if cache == nil {
+		cache = &fileCache{
+			files: []File{},
 		}
 	}
 
-	return results
+	return cache
 }
 
 func (cache *fileCache) getFileFromCommit(commitSHA string, fileName string) (int, *File) {
@@ -73,6 +62,17 @@ func (cache *fileCache) getFileFromCommit(commitSHA string, fileName string) (in
 	}
 
 	return -1, nil
+}
+
+func (cache *fileCache) getFilesFromCommit(commitSHA string) []*File {
+	var results []*File
+	for _, file := range cache.files {
+		if file.CommitSHA == commitSHA {
+			results = append(results, &file)
+		}
+	}
+
+	return results
 }
 
 func GetFile(query GitHubFileQuery, client *github.Client) (*File, error) {
