@@ -27,9 +27,19 @@ type File struct {
 	Status       FileState
 }
 
-// Todo: If this is going to run as a serverless application, then this may need to be replaced with something like Redis or Memcached
+// Todo: If this is going to run as a serverless application, then it will make more sense to use Redis or Memcached
 type fileCache struct {
 	files []File
+}
+
+func getFileCache() *fileCache {
+	if cache == nil {
+		cache = &fileCache{
+			files: []File{},
+		}
+	}
+
+	return cache
 }
 
 func (cache *fileCache) addFile(file File) {
@@ -64,18 +74,6 @@ func (cache *fileCache) getFileFromCommit(commitSHA string, fileName string) (in
 
 	return -1, nil
 }
-
-func getFileCache() *fileCache {
-	if cache == nil {
-		cache = &fileCache{
-			files: []File{},
-		}
-	}
-
-	return cache
-}
-
-// TODO: Split the file into cache and scanner?
 
 func GetFile(query GitHubFileQuery, client *github.Client) (*File, error) {
 
