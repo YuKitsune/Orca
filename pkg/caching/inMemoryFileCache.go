@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	cache *fileCache
+	cache *inMemoryFileCache
 )
 
 const (
@@ -36,11 +36,11 @@ type File struct {
 }
 
 // Todo: If this is going to run as a serverless application, then it will make more sense to use Redis or Memcached
-type fileCache struct {
+type inMemoryFileCache struct {
 	files []File
 }
 
-func (cache *fileCache) addFile(file File) {
+func (cache *inMemoryFileCache) addFile(file File) {
 
 	// Remove any conflicting file
 	index, existingFile := cache.getFileFromCommit(file.CommitSHA, file.Path)
@@ -52,9 +52,9 @@ func (cache *fileCache) addFile(file File) {
 	cache.files = append(cache.files, file)
 }
 
-func getFileCache() *fileCache {
+func getFileCache() *inMemoryFileCache {
 	if cache == nil {
-		cache = &fileCache{
+		cache = &inMemoryFileCache{
 			files: []File{},
 		}
 	}
@@ -62,7 +62,7 @@ func getFileCache() *fileCache {
 	return cache
 }
 
-func (cache *fileCache) getFileFromCommit(commitSHA string, fileName string) (int, *File) {
+func (cache *inMemoryFileCache) getFileFromCommit(commitSHA string, fileName string) (int, *File) {
 	for i, file := range cache.files {
 		if file.CommitSHA == commitSHA && file.Path == fileName {
 			return i, &file
@@ -72,7 +72,7 @@ func (cache *fileCache) getFileFromCommit(commitSHA string, fileName string) (in
 	return -1, nil
 }
 
-func (cache *fileCache) getFilesFromCommit(commitSHA string) []*File {
+func (cache *inMemoryFileCache) getFilesFromCommit(commitSHA string) []*File {
 	var results []*File
 	for _, file := range cache.files {
 		if file.CommitSHA == commitSHA {
