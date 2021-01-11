@@ -6,18 +6,11 @@ import (
 	"github.com/google/go-github/v33/github"
 	"log"
 	"strings"
+	"Orca/pkg/caching"
 )
 
-type GitHubFileQuery struct {
-	RepoOwner string
-	RepoName  string
-	CommitSHA string
-	FileName  string
-	Status    FileState
-}
-
 type FileContentMatch struct {
-	File
+	caching.File
 	LineMatch
 }
 
@@ -54,7 +47,7 @@ func NewScanner(patternStore *PatternStore) (*Scanner, error) {
 
 func (scanner *Scanner) CheckFileContentFromQueries(
 	githubClient *github.Client,
-	fileQueries []GitHubFileQuery) ([]CommitScanResult, error) {
+	fileQueries []caching.GitHubFileQuery) ([]CommitScanResult, error) {
 
 	var commitScanResults []CommitScanResult
 	for _, fileQuery := range fileQueries {
@@ -65,7 +58,7 @@ func (scanner *Scanner) CheckFileContentFromQueries(
 		commitScanResult := CommitScanResult{Commit: fileQuery.CommitSHA}
 
 		// If the file was removed, then mark any previous matches as resolved
-		if fileQuery.Status == FileRemoved {
+		if fileQuery.Status == caching.FileRemoved {
 			for i, previousScanResult := range commitScanResults {
 				for j, previousFileMatch := range previousScanResult.Matches {
 					if previousFileMatch.Path == fileQuery.FileName {
@@ -78,7 +71,7 @@ func (scanner *Scanner) CheckFileContentFromQueries(
 		}
 
 		// Can only scan contents of added and modified files
-		if fileQuery.Status != FileAdded && fileQuery.Status != FileModified {
+		if fileQuery.Status != caching.FileAdded && fileQuery.Status != caching.FileModified {
 			continue
 		}
 
@@ -120,15 +113,15 @@ func (scanner *Scanner) CheckFileContentFromQueries(
 
 func (scanner *Scanner) CheckFileContentFromQuery(
 	githubClient *github.Client,
-	fileQuery GitHubFileQuery) ([]FileContentMatch, error) {
+	fileQuery caching.GitHubFileQuery) ([]FileContentMatch, error) {
 
 	// Can't check the Content of a deleted file, just error our here and save ourselves another HTTP request
-	if fileQuery.Status == FileRemoved {
+	if fileQuery.Status == caching.FileRemoved {
 		errMessage := fmt.Sprintf("cannot check Content of file \"%s\" as it was removed in the specified commit (%s)", fileQuery.FileName, fileQuery.CommitSHA)
 		return nil, errors.New(errMessage)
 	}
 
-	file, err := GetFile(fileQuery, githubClient)
+	file, err := caching.GetFile(fileQuery, githubClient)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +129,7 @@ func (scanner *Scanner) CheckFileContentFromQuery(
 	return scanner.CheckFileContent(file)
 }
 
-func (scanner *Scanner) CheckFileContent(file *File) ([]FileContentMatch, error) {
+func (scanner *Scanner) CheckFileContent(file *caching.File) ([]FileContentMatch, error) {
 
 	var result []FileContentMatch
 

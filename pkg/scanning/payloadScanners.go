@@ -1,6 +1,7 @@
 package scanning
 
 import (
+	"Orca/pkg/caching"
 	"github.com/google/go-github/v33/github"
 	"sort"
 )
@@ -59,39 +60,39 @@ func (scanner *Scanner) CheckPush(push *github.PushEvent, githubClient *github.C
 
 	// Get a list of files to check
 	// Todo: Store the File Queries so that CheckSuites don't have to send extra requests to the GitHub API
-	var fileQueries []GitHubFileQuery
+	var fileQueries []caching.GitHubFileQuery
 	for _, commit := range push.Commits {
 
 		// Added files
 		for _, file := range commit.Added {
-			fileQueries = append(fileQueries, GitHubFileQuery{
+			fileQueries = append(fileQueries,caching. GitHubFileQuery{
 				RepoOwner: *push.Repo.Owner.Login,
 				RepoName:  *push.Repo.Name,
 				CommitSHA: *commit.ID,
 				FileName:  file,
-				Status:    FileAdded,
+				Status:    caching.FileAdded,
 			})
 		}
 
 		// Modified files
 		for _, file := range commit.Modified {
-			fileQueries = append(fileQueries, GitHubFileQuery{
+			fileQueries = append(fileQueries, caching.GitHubFileQuery{
 				RepoOwner: *push.Repo.Owner.Login,
 				RepoName:  *push.Repo.Name,
 				CommitSHA: *commit.ID,
 				FileName:  file,
-				Status:    FileModified,
+				Status:    caching.FileModified,
 			})
 		}
 
 		// Removed files
 		for _, file := range commit.Removed {
-			fileQueries = append(fileQueries, GitHubFileQuery{
+			fileQueries = append(fileQueries, caching.GitHubFileQuery{
 				RepoOwner: *push.Repo.Owner.Login,
 				RepoName:  *push.Repo.Name,
 				CommitSHA: *commit.ID,
 				FileName:  file,
-				Status:    FileRemoved,
+				Status:    caching.FileRemoved,
 			})
 		}
 	}

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"Orca/pkg/caching"
 	"Orca/pkg/scanning"
 	"context"
 	"fmt"
@@ -62,7 +63,7 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 			//	Have to assume the commits are in the correct order.
 
 			// Get a list of commit SHAs
-			var fileQueries []scanning.GitHubFileQuery
+			var fileQueries []caching.GitHubFileQuery
 			for _, commit := range commits {
 				commitSha := commit.SHA
 
@@ -78,17 +79,17 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 				}
 
 				for _, file := range commitWithFiles.Files {
-					var fileStatus scanning.FileState
+					var fileStatus caching.FileState
 					switch *file.Status {
 					case "added":
-						fileStatus = scanning.FileAdded
+						fileStatus = caching.FileAdded
 					case "modified":
-						fileStatus = scanning.FileModified
+						fileStatus = caching.FileModified
 					case "removed":
-						fileStatus = scanning.FileRemoved
+						fileStatus = caching.FileRemoved
 					}
 
-					fileQueries = append(fileQueries, scanning.GitHubFileQuery{
+					fileQueries = append(fileQueries, caching.GitHubFileQuery{
 						RepoOwner: *checkSuitePayload.Repo.Owner.Login,
 						RepoName:  *checkSuitePayload.Repo.Name,
 						CommitSHA: *commitSha,

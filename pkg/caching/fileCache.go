@@ -1,4 +1,4 @@
-package scanning
+package caching
 
 import (
 	"context"
@@ -18,6 +18,14 @@ const (
 )
 
 type FileState string
+
+type GitHubFileQuery struct {
+	RepoOwner string
+	RepoName  string
+	CommitSHA string
+	FileName  string
+	Status    FileState
+}
 
 type File struct {
 	CommitSHA    string
