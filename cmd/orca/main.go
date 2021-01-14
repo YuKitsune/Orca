@@ -86,7 +86,7 @@ func main() {
 				return errors.New("a webhook path must be provided")
 			}
 
-			// Check the port number
+			// Check the port number is valid
 			if port > 65535 || port < 1 {
 				return errors.New("a valid port number must be provided")
 			}
@@ -112,7 +112,7 @@ func main() {
 
 			// Check the secret
 			if len(secret) < 1 {
-				return errors.New("a secret is must be provided")
+				return errors.New("a secret must be provided")
 			}
 
 			// Check the app ID

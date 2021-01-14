@@ -241,8 +241,8 @@ func BuildMessage(results []scanning.CommitScanResult) (string, string) {
 
 				// Todo: Group lines which are directly below each other into one permalink (e.g. #L2-L4)
 				body += fmt.Sprintf("#### %s:\n", match.Kind)
-				body += fmt.Sprintf("`%s`\n", *match.Path)
-				body += fmt.Sprintf("%s#L%d\n", *match.PermalinkURL, match.LineNumber)
+				body += fmt.Sprintf("`%s`\n", match.Path)
+				body += fmt.Sprintf("%s#L%d\n", match.PermalinkURL, match.LineNumber)
 			}
 
 			body += "\n\n"

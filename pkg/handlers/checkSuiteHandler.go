@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"Orca/pkg/caching"
 	"Orca/pkg/scanning"
 	"context"
 	"fmt"
@@ -22,10 +23,10 @@ const (
 // BUG: This will trigger a failure even if the issue has been fixed in a more recent commit
 
 func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckSuiteEvent) {
-	fmt.Println("Handling Check Suite request...")
+	log.Println("Handling Check Suite request...")
 
 	// Create a new Check Run
-	fmt.Println("Creating new check run")
+	log.Println("Creating new check run")
 	inProgressString := string(checkRunStatusInProgress)
 	checkRun, _, err := handler.GitHubClient.Checks.CreateCheckRun(
 		context.Background(),
@@ -62,16 +63,45 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 			//	Have to assume the commits are in the correct order.
 
 			// Get a list of commit SHAs
-			var commitSHAs []string
+			var fileQueries []caching.GitHubFileQuery
 			for _, commit := range commits {
-				commitSHAs = append(commitSHAs, *commit.SHA)
+				commitSha := commit.SHA
+
+				// Todo: Files from commit not available in commit list, need another request...
+				commitWithFiles, _, err := handler.GitHubClient.Repositories.GetCommit(
+					context.Background(),
+					*checkSuitePayload.Repo.Owner.Login,
+					*checkSuitePayload.Repo.Name,
+					*commitSha)
+				if err != nil {
+					handler.handleFailure(checkRun, "Failed to get commit from Pull Request", err)
+					return
+				}
+
+				for _, file := range commitWithFiles.Files {
+					var fileStatus caching.FileState
+					switch *file.Status {
+					case "added":
+						fileStatus = caching.FileAdded
+					case "modified":
+						fileStatus = caching.FileModified
+					case "removed":
+						fileStatus = caching.FileRemoved
+					}
+
+					fileQueries = append(fileQueries, caching.GitHubFileQuery{
+						RepoOwner: *checkSuitePayload.Repo.Owner.Login,
+						RepoName:  *checkSuitePayload.Repo.Name,
+						CommitSHA: *commitSha,
+						FileName:  *file.Filename,
+						Status:    fileStatus,
+					})
+				}
 			}
 
-			commitScanResults, err := handler.Scanner.CheckCommits(
-				checkSuitePayload.Repo.Owner.Login,
-				checkSuitePayload.Repo.Name,
+			commitScanResults, err := handler.Scanner.CheckFileContentFromQueries(
 				handler.GitHubClient,
-				commitSHAs)
+				fileQueries)
 			if err != nil {
 				handler.handleFailure(checkRun, "Failed to scan commits from Pull Request", err)
 				return
@@ -95,10 +125,10 @@ func (handler *PayloadHandler) HandleCheckSuite(checkSuitePayload *github.CheckS
 					body += "If any sensitive information is in the history, please make sure it is addressed appropriately." // Todo: Reword this line
 					_, _, err := handler.GitHubClient.Issues.CreateComment(
 						context.Background(),
-						*checkSuitePayload. Repo.Owner.Login,
+						*checkSuitePayload.Repo.Owner.Login,
 						*checkSuitePayload.Repo.Name,
 						*pullRequest.Number,
-						&github.IssueComment {
+						&github.IssueComment{
 							Body: &body,
 						})
 					if err != nil {

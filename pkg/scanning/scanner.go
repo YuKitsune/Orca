@@ -1,23 +1,17 @@
 package scanning
 
 import (
-	"context"
-	"encoding/base64"
+	"errors"
+	"fmt"
 	"github.com/google/go-github/v33/github"
 	"log"
 	"strings"
+	"Orca/pkg/caching"
 )
 
 type FileContentMatch struct {
-	File
+	caching.File
 	LineMatch
-}
-
-type File struct {
-	Path         *string
-	Content      *string
-	HTMLURL      *string
-	PermalinkURL *string
 }
 
 type LineMatch struct {
@@ -51,80 +45,61 @@ func NewScanner(patternStore *PatternStore) (*Scanner, error) {
 	return scanner, nil
 }
 
-func (scanner *Scanner) CheckCommits(
-	repoOwner *string,
-	repoName *string,
+func (scanner *Scanner) CheckFileContentFromQueries(
 	githubClient *github.Client,
-	commitSHAs []string) ([]CommitScanResult, error) {
+	fileQueries []caching.GitHubFileQuery) ([]CommitScanResult, error) {
 
 	var commitScanResults []CommitScanResult
-	for _, commitSHA := range commitSHAs {
+	for _, fileQuery := range fileQueries {
 
 		// NOTE: ListCommits does not include any references to which files were changed (commit.Files is always nil),
 		//	so we need to send another request specifically for the commit
 		// TODO: Find a way around this to prevent getting rate limited
-		commitScanResult := CommitScanResult{Commit: commitSHA}
-		commitWithFiles, _, err := githubClient.Repositories.GetCommit(
-			context.Background(),
-			*repoOwner,
-			*repoName,
-			commitSHA)
+		commitScanResult := CommitScanResult{Commit: fileQuery.CommitSHA}
+
+		// If the file was removed, then mark any previous matches as resolved
+		if fileQuery.Status == caching.FileRemoved {
+			for i, previousScanResult := range commitScanResults {
+				for j, previousFileMatch := range previousScanResult.Matches {
+					if previousFileMatch.Path == fileQuery.FileName {
+						commitScanResults[i].Matches[j].Resolved = true
+					}
+				}
+			}
+
+			continue
+		}
+
+		// Can only scan contents of added and modified files
+		if fileQuery.Status != caching.FileAdded && fileQuery.Status != caching.FileModified {
+			continue
+		}
+
+		log.Printf("Checking %s from %s", fileQuery.FileName, fileQuery.CommitSHA)
+
+		fileContentMatches, err := scanner.CheckFileContentFromQuery(githubClient, fileQuery)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, file := range commitWithFiles.Files {
+		if len(fileContentMatches) > 0 {
 
-			// If the file was removed, then mark any previous matches as resolved
-			if *file.Status == "removed" {
-				for i, previousScanResult := range commitScanResults {
-					for j, previousFileMatch := range previousScanResult.Matches {
-						if *previousFileMatch.Path == *file.Filename {
-							commitScanResults[i].Matches[j].Resolved = true
-						}
-					}
+			// Ignore previously known matches
+			for _, fileContentMatch := range fileContentMatches {
+				if !MatchIsKnown(getMatches(commitScanResults), fileContentMatch) {
+					commitScanResult.Matches = append(commitScanResult.Matches, fileContentMatch)
 				}
-
-				continue
 			}
 
-			// Can only scan contents of added and modified files
-			if *file.Status != "added" && *file.Status != "modified" {
-				continue
-			}
+		} else {
 
-			log.Printf("Checking %s from %s", *file.Filename, commitSHA)
-
-			fileContentMatches, err := scanner.CheckFileContentFromCommit(
-				githubClient,
-				repoOwner,
-				repoName,
-				&commitSHA,
-				file.Filename)
-			if err != nil {
-				return nil, err
-			}
-
-			if len(fileContentMatches) > 0 {
-
-				// Ignore previously known matches
-				for _, fileContentMatch := range fileContentMatches {
-					if !MatchIsKnown(getMatches(commitScanResults), fileContentMatch) {
-						commitScanResult.Matches = append(commitScanResult.Matches, fileContentMatch)
+			// No matches found, previous matches in this file should be resolved
+			for i, previousScanResult := range commitScanResults {
+				for j, previousFileMatch := range previousScanResult.Matches {
+					if previousFileMatch.Path == fileQuery.FileName {
+						commitScanResults[i].Matches[j].Resolved = true
 					}
 				}
-
-			} else {
-
-				// No matches found, previous matches in this file should be resolved
-				for i, previousScanResult := range commitScanResults {
-					for j, previousFileMatch := range previousScanResult.Matches {
-						if *previousFileMatch.Path == *file.Filename {
-							commitScanResults[i].Matches[j].Resolved = true
-						}
-					}
-				}
-
 			}
 		}
 
@@ -136,46 +111,25 @@ func (scanner *Scanner) CheckCommits(
 	return commitScanResults, nil
 }
 
-func (scanner *Scanner) CheckFileContentFromCommit(
+func (scanner *Scanner) CheckFileContentFromQuery(
 	githubClient *github.Client,
-	repoOwner *string,
-	repoName *string,
-	commit *string,
-	filePath *string) ([]FileContentMatch, error) {
+	fileQuery caching.GitHubFileQuery) ([]FileContentMatch, error) {
 
-	// Todo: Is there a bulk alternative to GetContents?
-	// 	Don't want to request for each file, could have a big commit
-	content, _, _, err := githubClient.Repositories.GetContents(
-		context.Background(),
-		*repoOwner,
-		*repoName,
-		*filePath,
-		&github.RepositoryContentGetOptions{
-			Ref: *commit,
-		})
-	if err != nil {
-		return nil, err
+	// Can't check the Content of a deleted file, just error our here and save ourselves another HTTP request
+	if fileQuery.Status == caching.FileRemoved {
+		errMessage := fmt.Sprintf("cannot check Content of file \"%s\" as it was removed in the specified commit (%s)", fileQuery.FileName, fileQuery.CommitSHA)
+		return nil, errors.New(errMessage)
 	}
 
-	contentBytes, err := base64.StdEncoding.DecodeString(*content.Content)
+	file, err := caching.GetFile(fileQuery, githubClient)
 	if err != nil {
 		return nil, err
-	}
-	contentString := string(contentBytes)
-
-	permalinkUrl := *content.HTMLURL
-
-	file := File{
-		Path:         content.Path,
-		Content:      &contentString,
-		HTMLURL:      content.HTMLURL,
-		PermalinkURL: &permalinkUrl,
 	}
 
 	return scanner.CheckFileContent(file)
 }
 
-func (scanner *Scanner) CheckFileContent(file File) ([]FileContentMatch, error) {
+func (scanner *Scanner) CheckFileContent(file *caching.File) ([]FileContentMatch, error) {
 
 	var result []FileContentMatch
 
@@ -187,7 +141,7 @@ func (scanner *Scanner) CheckFileContent(file File) ([]FileContentMatch, error) 
 	if len(lineMatches) > 0 {
 		for _, lineMatch := range lineMatches {
 			fileMatch := FileContentMatch{
-				File:      file,
+				File:      *file,
 				LineMatch: lineMatch,
 			}
 
@@ -198,12 +152,12 @@ func (scanner *Scanner) CheckFileContent(file File) ([]FileContentMatch, error) 
 	return result, nil
 }
 
-func (scanner *Scanner) CheckContent(content *string) ([]LineMatch, error) {
+func (scanner *Scanner) CheckContent(content string) ([]LineMatch, error) {
 
 	var result []LineMatch
 
 	// Todo: Multi-line scan first, then single-line scan around any multi-line match ranges
-	var lines = strings.Split(*content, "\n")
+	var lines = strings.Split(content, "\n")
 	for i, line := range lines {
 		lineNumber := i + 1
 		matchesOnLine, err := scanner.scanLineForPatterns(line)
@@ -283,7 +237,7 @@ func getMatches(commitScanResults []CommitScanResult) []FileContentMatch {
 
 func MatchIsKnown(knownFileContentMatches []FileContentMatch, newFileContentMatch FileContentMatch) bool {
 	for _, knownFileContentMatch := range knownFileContentMatches {
-		if *knownFileContentMatch.Path == *newFileContentMatch.Path {
+		if knownFileContentMatch.Path == newFileContentMatch.Path {
 			if newFileContentMatch.value == knownFileContentMatch.value &&
 				!knownFileContentMatch.Resolved {
 				return true
